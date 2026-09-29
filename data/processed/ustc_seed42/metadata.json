@@ -1,0 +1,52 @@
+{
+  "dataset": "USTC",
+  "seed": 42,
+  "known_mode": "random",
+  "known_count": 12,
+  "known_classes": [
+    0,
+    1,
+    3,
+    5,
+    7,
+    10,
+    11,
+    12,
+    13,
+    17,
+    18,
+    19
+  ],
+  "open_classes": [
+    2,
+    4,
+    6,
+    8,
+    9,
+    14,
+    15,
+    16
+  ],
+  "unknown_model_label": 12,
+  "class_to_model_label": {
+    "0": 0,
+    "1": 1,
+    "3": 2,
+    "5": 3,
+    "7": 4,
+    "10": 5,
+    "11": 6,
+    "12": 7,
+    "13": 8,
+    "17": 9,
+    "18": 10,
+    "19": 11
+  },
+  "split_sizes": {
+    "closed_train": 39980,
+    "open_valid": 20000,
+    "open_test": 20000,
+    "closed_test": 8568,
+    "closed_valid": 8567
+  }
+}

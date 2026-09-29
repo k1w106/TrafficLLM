@@ -1,0 +1,42 @@
+# Python and local environments
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.key
+
+# External source data: never commit
+/data/raw/
+/data/interim/
+
+# Track only reproducibility metadata from processed data
+/data/processed/**
+!/data/processed/**/
+!/data/processed/**/manifest.csv
+!/data/processed/**/metadata.json
+!/data/processed/**/README.md
+
+# Generated experiment artifacts
+/outputs/
+/wandb/
+/runs/
+/logs/
+
+# Models and large binary data
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.npy
+*.npz
