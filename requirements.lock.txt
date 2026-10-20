@@ -1,0 +1,15 @@
+# Phiên bản đã chạy được trên môi trường đồ án (Python 3.13.5, Debian/WSL2).
+# Cài bằng: pip install --user -r requirements.lock.txt
+transformers==5.17.0
+datasets==5.0.1
+accelerate==1.15.0
+scikit-learn==1.9.1
+scipy==1.17.1
+numpy==2.4.4
+pandas==2.3.3
+pyarrow==25.0.0
+matplotlib==3.11.2
+seaborn==0.13.2
+tqdm==4.67.3
+PyYAML==6.0.2
+pytest==9.1.1
