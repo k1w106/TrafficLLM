@@ -1,0 +1,42 @@
+# P3 — fine-tune GPT-2 small trên closed-set USTC, rồi cache feature.
+experiment: ustc_gpt2_seed42
+mode: corrected
+seed: 42
+
+data:
+  encoded_path: data/processed/ustc_seed42/encoded_gpt2.parquet
+  text_column: text
+  label_column: model_label
+  train_partition: closed_train
+  valid_partition: closed_valid
+  test_partition: closed_test
+
+model:
+  name: gpt2
+  num_labels: 12
+  max_len: 1024          # do dai that 144-256 token -> khong cat gi
+  # eager = attention tat dinh (flash/sdpa khong tat dinh o backward -> pha yeu cau
+  # "cung seed ra cung ket qua"). Do that: 336 ms/step, peak 4.87 GB.
+  attn_implementation: eager
+
+train:
+  batch_size: 12
+  eval_batch_size: 32    # 64 lam tran VRAM sau khi train (cache 6 GB) -> cham 5 lan
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  adam_eps: 1.0e-8
+  epochs: 3
+  warmup_steps: 0
+  grad_clip: 1.0
+  amp: bf16              # bf16 | fp32 (do that: bf16 289 ms/step, fp32 426 ms/step)
+  deterministic: true
+  num_workers: 0
+  checkpoint_dir: outputs/checkpoints
+  checkpoint_name: ustc_gpt2_seed42.pt
+
+features:
+  output_path: outputs/features/ustc_seed42.npz
+  batch_size: 32
+
+metrics:
+  output_path: outputs/metrics/ustc_gpt2_seed42.json

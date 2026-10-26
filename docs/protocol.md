@@ -43,3 +43,78 @@
   (`metadata.json["unknown_model_label"]`).
 - `model_label` ≠ `original_label` (lớp known được chọn ngẫu nhiên, seed 42).
   Luôn ánh xạ qua `metadata.json["class_to_model_label"]`.
+
+## Fine-tune GPT-2 (P3)
+
+Cấu hình: `configs/ustc_gpt2_seed42.yaml`, seed 42, `GPT2ForSequenceClassification`
+(124,4M tham số, `num_labels=12`), khởi tạo từ `gpt2`, lớp `score` (12 × 768) là mới.
+
+| Tham số | Giá trị |
+|---|---|
+| `max_len` | 1024 (không trace nào bị cắt — xem bảng độ dài token) |
+| Padding | động theo batch, bên phải, `pad_token` = eos (50256) |
+| Optimizer | AdamW, lr 5e-5, weight decay 0,01, eps 1e-8 |
+| Scheduler | giảm tuyến tính, warmup 0 |
+| Gradient clip | 1,0 |
+| Epoch / batch | 3 / 12 (train), 32 (eval) |
+| Độ chính xác số học | bf16 autocast (`amp: bf16`) |
+| Attention | `eager` — xem ghi chú bên dưới |
+| Chọn checkpoint | `closed_valid` accuracy cao nhất, lưu ngay sau mỗi epoch |
+
+**Vì sao `attn_implementation=eager`:** attention mặc định (flash / memory-efficient
+SDPA) không tất định ở lượt backward — PyTorch cảnh báo rõ điều này. Giữ mặc định thì
+"cùng seed ra cùng kết quả" sai, phá yêu cầu tái lập. Eager chậm hơn ~16%
+(336 so với 289 ms/step) và tốn thêm ~0,5 GB VRAM, đổi lại tất định.
+Kiểm chứng: `scripts/train_gpt2.py --determinism-check` chạy 2 lần cùng seed,
+so loss + accuracy + tổng 124,4M trọng số → giống hệt từng chữ số.
+
+**Ghi chú vận hành (GPU 6 GB):** sau khi train xong, allocator của PyTorch vẫn giữ
+~6 GB cache; nếu đánh giá valid ngay thì tràn sang RAM hệ thống và chậm ~5 lần
+(0,55 → 2,9 s/batch). Vì vậy `evaluate()` gọi `torch.cuda.empty_cache()` trước khi
+chạy và `eval_batch_size` để 32. Đây là lý do một epoch mất ~23 phút chứ không phải
+vài giờ.
+
+### Kết quả
+
+| Epoch | train_loss | train_acc | valid_loss | valid_acc | Thời gian |
+|---|---:|---:|---:|---:|---:|
+| 1 | 0,203433 | 0,941171 | 0,027017 | 0,996848 | 22,8 phút |
+| 2 | 0,010403 | 0,998299 | 0,005974 | 0,998949 | 26,5 phút |
+| 3 | 0,001806 | 0,999650 | 0,001986 | 0,999650 | 22,5 phút |
+
+- Best epoch: **3**, `closed_valid` accuracy = **0,999650**. Tổng thời gian 71,8 phút.
+- `closed_test` (không dùng khi train): **0,999767** (8.566/8.568).
+- `closed_train` sau khi trích lại: 0,999925 (39.977/39.980).
+- Không có dấu hiệu học vẹt: `valid_acc` ≥ `train_acc` ở cả 3 epoch.
+- Checkpoint: `outputs/checkpoints/ustc_gpt2_seed42.pt` (475 MB) + `.config.yaml`.
+
+**So sánh với paper:** 0,9996 cao hơn khoảng 0,98–0,996 mà paper báo cho closed-set.
+Đây **không phải** bằng chứng tốt hơn paper — split khác nhau (ta 12/20 class known,
+paper nói 40% = 8/20) và USTC là dataset "dễ" (trace cùng ứng dụng rất giống nhau).
+Kết luận: bài closed-set gần bão hoà, phần đo lường có ý nghĩa của đồ án nằm ở
+open-set (P4) và audit (P5).
+
+## Feature cache (P3)
+
+`outputs/features/ustc_seed42.npz` (602 MB), trích **một lần** cho toàn bộ 97.115 mẫu
+bằng `scripts/extract_features.py` (15,6 phút). Từ P4 trở đi mọi detector chạy trên
+cache, không chạy lại GPT-2.
+
+| Khoá | Shape | Dtype | Nội dung |
+|---|---|---|---|
+| `sample_id` | (97115,) | int64 | Khớp thứ tự `manifest.csv`; nối bằng khoá này |
+| `logits` | (97115, 12) | float32 | Điểm thô **trước** softmax cho 12 lớp known |
+| `emb_last` | (97115, 768) | float32 | Hidden state lớp cuối tại **token cuối không phải pad** |
+| `emb_mean` | (97115, 768) | float32 | Trung bình hidden state lớp cuối trên token không pad, có áp mask |
+
+- `emb_last` là đúng vị trí classification head đọc. Lưu ý `transformers` 5.x áp
+  `score` lên cả chuỗi rồi mới lấy vị trí token cuối (v4 lấy token cuối rồi mới `score`);
+  vì `score` là Linear theo chiều cuối nên hai cách tương đương. Khoá bằng
+  `tests/test_features.py` (so `score(emb_last)` với `model(...).logits`).
+- Kiểm chứng cache không lệch: accuracy tính lại từ `logits` trên `closed_valid`
+  = 0,9996498191, **khớp chính xác** con số lúc train. Không có NaN/Inf.
+- `logits` là điểm thô, không phải xác suất: P4 tự áp softmax / nhiệt độ T, nhờ vậy
+  chỉnh T cho Energy hay OpenMax **không cần** chạy lại model.
+- Cache chứa cả 40.000 mẫu `open_*` (model chưa từng thấy) — cần cho unknown recall,
+  AUROC, AUPR, OSCR và tỉ lệ phát hiện theo từng class open.
+
