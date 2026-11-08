@@ -142,6 +142,46 @@ python3 scripts/analyze_token_length.py
 
 Số liệu chi tiết và cách đọc: `docs/protocol.md`, `docs/experiment-log.md`.
 
+## Tiếp tục phát triển (đang ở P4)
+
+Code P4 hiện có:
+
+| File | Vai trò |
+|---|---|
+| `src/trafficllm/openset/scoring.py` | MSP, Energy, class means, neighbor sets, K-LND 1/2/3 |
+| `src/trafficllm/openset/calibration.py` | ngưỡng phân vị per-class, hiệu chỉnh **chỉ** từ `closed_valid` |
+| `src/trafficllm/evaluation/metrics.py` | AUROC, AUPR, FPR@95TPR, macro-F1, confusion matrix |
+| `docs/protocol.md` | định nghĩa metric, bảng khác biệt `reference` / `corrected` |
+
+Việc còn lại, làm đúng thứ tự:
+
+1. **OpenMax** → `src/trafficllm/openset/openmax.py`
+   Mean embedding mỗi class từ `closed_train` (`emb_last`), fit Weibull trên `closed_valid`,
+   hiệu chỉnh logits theo rank `alpha`, score = `1 − max p_revised`. Không có bản upstream nên
+   chỉ báo cáo `corrected`.
+2. **Runner** → `scripts/run_openset.py` + `configs/openset_ustc_seed42.yaml`
+   Nạp cache + manifest, chạy 5 detector × 2 chế độ, xuất `outputs/metrics/openset_ustc_seed42.json`
+   (đủ 9 metric, confusion 13×13, tỉ lệ theo 8 class open, độ nhạy T của MSP/Energy) và bản `.csv`.
+3. **Test** → `tests/test_openset_detectors.py`
+   Dữ liệu Gaussian giả lập: hướng score, chiều ngưỡng, self-neighbor, fallback class rỗng,
+   mẫu số 0, ngưỡng per-class.
+4. **Chạy thật + ghi log**: thêm một dòng vào `docs/experiment-log.md` (ngày, config, seed, lệnh, metric chính).
+5. **Commit**: `P4: ...`, không commit `data/`, `outputs/checkpoints/`, `outputs/features/`.
+
+Quy ước không được vi phạm khi làm tiếp (chi tiết: `AGENTS.md` §6):
+
+- Mọi detector trả **anomaly score, cao hơn = lạ hơn**.
+- Ngưỡng chỉ hiệu chỉnh từ `closed_valid`; **không** nhìn dữ liệu open. `open_valid` để nguyên cho P6.
+- Hai chế độ `reference` / `corrected`; mọi bảng/hình phải ghi rõ chế độ nào sinh ra nó.
+- Seed mọi thứ, lưu config + seed cùng kết quả.
+- Không báo con số chưa tính.
+
+Trước khi commit:
+
+```bash
+PYTHONPATH=src pytest -q
+```
+
 ## Cấu trúc
 
 ```
