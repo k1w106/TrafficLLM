@@ -118,3 +118,63 @@ cache, không chạy lại GPT-2.
 - Cache chứa cả 40.000 mẫu `open_*` (model chưa từng thấy) — cần cho unknown recall,
   AUROC, AUPR, OSCR và tỉ lệ phát hiện theo từng class open.
 
+## Open-set (P4): định nghĩa metric
+
+Viết **trước khi** cài đặt, để mọi con số trong báo cáo có nghĩa xác định.
+
+### Quy ước chung
+
+- Mỗi detector trả về **anomaly score** `s`: **cao hơn = lạ hơn**. Quyết định:
+  `unknown` (label 12) nếu `s > τ`, ngược lại giữ lớp `argmax` của logits.
+- `τ` hiệu chỉnh **chỉ trên `closed_valid`**; không bao giờ dùng dữ liệu open (§6.3).
+- Đánh giá trên `closed_test` (known) + `open_test` (unknown).
+  `open_valid` để nguyên cho Background Class (P6), không dùng ở P4 (§6.2).
+- Không gian nhãn khi đánh giá: `0..11` known, `12` unknown.
+
+### Hai chế độ
+
+| Khía cạnh | `reference` | `corrected` |
+|---|---|---|
+| Ngưỡng | phân vị 0,8 dạng nearest-rank như upstream (`TH_value=0.8`, loại ~20% known) | giữ 95% known (`keep_rate=0.95`) |
+| Tập láng giềng của K-LND | **gồm cả chính class đang xét** (lỗi upstream: `Values[i][i]` luôn = 0 nên luôn được chọn) | loại chính nó |
+| K-LND 2/3 khi tính score | mẫu **closed** cộng trên *tất cả* class, mẫu **open** chỉ cộng trên K class (lỗi upstream) | cả hai dùng **cùng một** tập K |
+| Class rỗng | `TH = 10` cho class 0, class sau lấy TH class trước (magic number) | fallback về phân vị toàn cục |
+| Mẫu số 0 (K-LND 3) | không chặn → NaN/inf | chặn bằng epsilon |
+| Nhiệt độ `T` | 1 | 1 (xem ghi chú bên dưới) |
+
+**Vì sao cả hai chế độ dùng `T = 1`:** dự định ban đầu là chọn `T` bằng NLL trên
+`closed_valid`, nhưng với model này tiêu chí đó **suy biến**. Bằng chứng đo được trên
+cache: top-probability trung vị trên `closed_valid` = **1,000000** (logit max 23,06,
+margin trung vị 15,77), tức softmax đã bão hoà; giảm `T` chỉ làm NLL tiến sát 0, nên
+nghiệm luôn rơi vào biên lưới. Không có tiêu chí nào chỉ dùng dữ liệu closed chọn được
+`T > 1`. Vì vậy giữ `T = 1` ở cả hai chế độ và **báo cáo độ nhạy của MSP/Energy theo T**
+như một *chẩn đoán*, ghi rõ không dùng để chọn ngưỡng hay chọn T.
+
+### Định nghĩa từng metric
+
+Ký hiệu: `K` = tập `closed_test`, `U` = tập `open_test`.
+
+| Metric | Định nghĩa |
+|---|---|
+| `closed_argmax_accuracy` | Tỉ lệ `argmax` đúng trên `K` **trước** khi áp ngưỡng |
+| `CCR` (closed-set correct classification rate) | Tỉ lệ mẫu `K` vừa **không bị từ chối** vừa **đúng lớp**. Đây là "Test accuracy Normal model_Closed_set" của upstream |
+| `unknown_recall` (UCR) | Tỉ lệ mẫu `U` bị từ chối (`s > τ`). Đây là "Test accuracy Normal model_Open_set" của upstream |
+| `FPR` | Tỉ lệ mẫu `K` bị từ chối nhầm = `1 − TNR` |
+| `AUROC` | Diện tích dưới ROC với positive = unknown, dùng anomaly score thô (không phụ thuộc ngưỡng) |
+| `AUPR` | Average precision, positive = unknown; kèm `prevalence = |U| / (|K|+|U|)` vì AUPR phụ thuộc tỉ lệ |
+| `FPR@95TPR` | FPR nhỏ nhất đạt `unknown_recall ≥ 0,95`; quét toàn bộ ngưỡng trên score thô. Càng thấp càng tốt |
+| `OSCR` | Trung bình điều hoà của `CCR` và `TNR` tại ngưỡng đã hiệu chỉnh: `2·CCR·TNR / (CCR + TNR)` |
+| `balanced_F1` | macro-F1 của bài toán nhị phân known/unknown tại ngưỡng đã hiệu chỉnh. Báo ở **tỉ lệ tự nhiên** và **1:1** (lấy ngẫu nhiên `|K|` mẫu `U`, seed 42) |
+| `confusion_matrix` | Ma trận 13 × 13 (12 known + unknown) trên `K ∪ U` |
+| `open_class_detection` | Với từng class open (nhãn gốc), tỉ lệ bị từ chối. Giữ nhãn gốc xuyên suốt (§6.7) |
+| `known_rejection_on_valid` | Tỉ lệ mẫu `closed_valid` bị từ chối. **Chẩn đoán chiều phân vị**: chế độ `reference` sẽ ra ~0,20, chế độ `corrected` ~0,05 |
+
+**Ghi chú về ngưỡng theo lớp:** K-LND dùng ngưỡng riêng cho từng lớp dự đoán `d`
+(giống upstream). Vì vậy `AUROC`, `AUPR`, `FPR@95TPR` tính trên score thô (không ngưỡng),
+còn `CCR`, `unknown_recall`, `OSCR`, `balanced_F1`, `confusion_matrix` dùng ngưỡng
+theo lớp. Khác biệt này được ghi rõ trong output.
+
+**Ghi chú về AUPR:** vì `|U| = 20.000` lớn hơn `|K| = 8.568`, prevalence ≈ 0,70 nên
+AUPR sẽ cao "tự nhiên"; luôn đọc kèm prevalence, không so sánh AUPR giữa hai tỉ lệ khác nhau.
+
+
