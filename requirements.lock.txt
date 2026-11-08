@@ -13,3 +13,4 @@ seaborn==0.13.2
 tqdm==4.67.3
 PyYAML==6.0.2
 pytest==9.1.1
+torch==2.14.0+cu126
