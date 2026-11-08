@@ -1,7 +1,8 @@
 # Phiên bản đã chạy được trên môi trường đồ án (Python 3.13.5, Debian/WSL2).
 # Cài bằng: pip install --user -r requirements.lock.txt
 #
-# PyTorch KHÔNG nằm trong file này vì bản +cuXXX chỉ có trên index riêng.
+# PyTorch KHÔNG nằm trong file này vì bản +cuXXX chỉ có trên index riêng
+# (PyPI không có torch==2.14.0+cu126 -> pip install -r sẽ báo "No matching distribution").
 # Cài trước, chọn đúng CUDA của máy (xem https://pytorch.org/get-started/locally/):
 #   pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126   # có GPU
 #   pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu     # chỉ CPU
@@ -18,4 +19,3 @@ seaborn==0.13.2
 tqdm==4.67.3
 PyYAML==6.0.2
 pytest==9.1.1
-torch==2.14.0+cu126
