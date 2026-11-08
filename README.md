@@ -22,16 +22,26 @@ OpenMax**. Chi tiết thiết kế: `AGENTS.md` và `docs/protocol.md`.
 | P1 | Manifest USTC (12 known / 8 open, seed 42) | xong |
 | P2 | Encoding không dùng nhãn + báo cáo độ dài token | xong |
 | P3 | Fine-tune GPT-2 + cache feature cho 97.115 mẫu | xong |
-| P4 | Detector open-set + metrics trên cache | đang làm |
+| P4 | Detector open-set + metrics trên cache | **đang làm** — còn OpenMax + runner + test |
+| P5 | Audit `reference` vs `corrected` trên cùng cache, run DC riêng | chưa làm |
+| P6 | Mở rộng: AWF/DF, GPT-2 random-init, logits vs embedding, ≥3 seed | chưa làm |
+| P7 | Báo cáo `docs/audit-report.md`, hình, bảng, hạn chế | chưa làm |
+
+Chi tiết tiêu chí "xong" của từng phase: `AGENTS.md` §8.
 
 ## Cài đặt
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.lock.txt      # bản đã chạy được, ghim version
+
+# PyTorch cài riêng (bản +cuXXX chỉ có trên index của PyTorch, không có trên PyPI)
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126   # có GPU
+# pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu    # chỉ CPU
+
+pip install -r requirements.lock.txt      # phần còn lại, đã ghim version
 ```
 
-Chạy test:
+Chạy test (lần đầu cần internet để tải tokenizer `gpt2`, ~1 MB):
 
 ```bash
 PYTHONPATH=src pytest -q
@@ -39,13 +49,25 @@ PYTHONPATH=src pytest -q
 
 ## Dữ liệu và artifact (KHÔNG nằm trong git)
 
-Repo này chỉ chứa code + metadata nhỏ (~3 MB). Ba thứ dưới đây phải tải riêng vì quá nặng:
+Repo này chỉ chứa code + metadata nhỏ (~3 MB). Ba thứ dưới đây không nằm trong git;
+**chỉ 2 file artifact là bắt buộc** để chạy P4:
 
 | Thứ cần | Kích thước | Lấy ở đâu |
 |---|---:|---|
-| `data/raw/.../USTC/` | ~118 MB | link gdown trong `docs/setup.md` |
+| `data/raw/.../USTC/` (chỉ khi dựng lại từ đầu) | ~118 MB | link Drive bên dưới |
 | `outputs/checkpoints/ustc_gpt2_seed42.pt` | 475 MB | GitHub Release tag `p3-artifacts` |
 | `outputs/features/ustc_seed42.npz` | 575 MB | GitHub Release tag `p3-artifacts` |
+
+Dataset gốc (không bắt buộc — P4 chỉ chạy trên cache): zip **232 MB**, chứa cả 5 dataset,
+giải nén hết là 11 GB, nên **chỉ lấy USTC**:
+
+```bash
+pip install gdown
+gdown "https://drive.google.com/uc?id=1-MVfxyHdQeUguBmYrIIw1jhMVSqxXQgO" -O /tmp/trafficllm_data.zip
+unzip -o /tmp/trafficllm_data.zip 'data/USTC/*' -d /tmp/ustc_extract
+mkdir -p data/raw/trafficllm_reference/trafficllm_data
+mv /tmp/ustc_extract/data/USTC data/raw/trafficllm_reference/trafficllm_data/
+```
 
 Tải artifact (bỏ qua bước train 72 phút):
 
@@ -66,6 +88,20 @@ Kiểm tra file tải xong (phải khớp):
 Chỉ cần checkpoint + feature là đủ để chạy P4 (mọi detector chạy trên cache).
 `manifest.csv` + `metadata.json` đã có sẵn trong git; `traces.npy` và
 `encoded_gpt2.parquet` chỉ cần nếu muốn dựng lại từ đầu.
+
+Kiểm tra cache đúng là của model này (10 giây):
+
+```bash
+PYTHONPATH=src python3 -c "
+import numpy as np, pandas as pd
+m = pd.read_csv('data/processed/ustc_seed42/manifest.csv')
+d = np.load('outputs/features/ustc_seed42.npz')
+print('khớp sample_id:', np.array_equal(d['sample_id'], m.sample_id.values))
+va = m.index[m.partition == 'closed_valid'].values
+acc = (d['logits'][va].argmax(1) == m.model_label.values[va]).mean()
+print('valid accuracy từ cache:', round(float(acc), 6), '(phải là 0.99965)')
+"
+```
 
 > Ghi chú cho người upload: nếu GitHub Release không dùng được, đẩy 2 file lên
 > HuggingFace (`hf upload <user>/trafficllm-ustc-seed42 <file>`) rồi sửa bảng trên.

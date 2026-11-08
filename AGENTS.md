@@ -83,11 +83,11 @@ Trước khi code, nêu kế hoạch trong ≤10 dòng. Chỉ đụng vào file 
 
 - **P0 ✅** môi trường, khung repo, smoke test.
 - **P1 ✅** manifest USTC (xem §5).
-- **P2 (đang làm)** encoding không dùng nhãn + độ dài token.
+- **P2 ✅** encoding không dùng nhãn + độ dài token.
   Xong khi: `encoded_gpt2.parquet` đủ 97.115 dòng; có `token_length_report.csv` và biết % vượt 1024 token
   theo từng partition; `tests/test_encoding_label_independence.py` pass; `docs/protocol.md` và
   `docs/experiment-log.md` đã cập nhật.
-- **P3** fine-tune GPT-2 trên `closed_train`, chọn checkpoint theo accuracy `closed_valid`, cache feature.
+- **P3 ✅** fine-tune GPT-2 trên `closed_train`, chọn checkpoint theo accuracy `closed_valid`, cache feature.
   - Mặc định: `GPT2ForSequenceClassification(num_labels=12)`, pad_token = eos, padding bên phải, lr 5e-5, AdamW wd 0.01,
     lịch giảm tuyến tính, grad clip 1.0, 3 epoch, batch 12, max_len 1024 với **dynamic padding**.
     Được dùng mixed precision nếu cần cho 6 GB VRAM; ghi vào config.
@@ -97,16 +97,25 @@ Trước khi code, nêu kế hoạch trong ≤10 dòng. Chỉ đụng vào file 
     `emb_mean` = trung bình trên các token không phải pad **có áp attention mask**. Join với manifest bằng `sample_id`.
   - Xong khi: cùng seed cho cùng kết quả hai lần; có accuracy trên closed_test; lưu checkpoint + config.
   - Không tự chạy job huấn luyện dài hơn ~10 phút: đưa cho user lệnh chính xác kèm thời gian ước lượng.
-- **P4** detector + metrics trên cache: MSP, Energy, K-LND 1/2/3 (cả hai chế độ), OpenMax; hiệu chỉnh ngưỡng từ
+- **P4 (đang làm)** detector + metrics trên cache: MSP, Energy, K-LND 1/2/3 (cả hai chế độ), OpenMax; hiệu chỉnh ngưỡng từ
   `closed_valid` (ví dụ giữ lại 95% mẫu known); metrics: closed accuracy, unknown recall, AUROC,
   FPR@95%TPR, AUPR, OSCR, balanced F1 (tỉ lệ unknown tự nhiên và 1:1), confusion matrix, tỉ lệ phát hiện theo từng class open.
   Viết định nghĩa metric vào `docs/protocol.md` **trước khi** cài đặt. Unit-test detector trên dữ liệu Gaussian giả lập.
-- **P5** audit: chạy `reference` so với `corrected` trên cùng cache và giải thích mọi chênh lệch.
+  Đã có: anomaly score MSP/Energy/K-LND 1-2-3, hiệu chỉnh ngưỡng, metric cơ bản trong
+  `src/trafficllm/{openset,evaluation}/`.
+  Còn thiếu: **OpenMax**, `scripts/run_openset.py`, unit-test Gaussian, mục OpenMax trong `docs/protocol.md`,
+  dòng P4 trong `docs/experiment-log.md`.
+- **P5 (chưa làm)** audit: chạy `reference` so với `corrected` trên cùng cache và giải thích mọi chênh lệch.
   DC cần **lần huấn luyện thứ hai** (leakage nằm ở encoding nên không dùng chung cache feature được).
   Thêm một run riêng, đặt tên rõ ràng, theo thiết lập của paper (paper nói 40% số class là closed = 8/20).
-- **P6** mở rộng: adapter AWF/DF (cắt/streaming lúc load), đối chứng GPT-2 random-init,
+  Xong khi: có bảng so sánh hai chế độ cho cả 5 detector; mỗi chênh lệch truy được về nguyên nhân cụ thể
+  (self-neighbor, bất đối xứng closed/open, chiều phân vị, operating point); run DC được đánh dấu rõ là run phụ.
+- **P6 (chưa làm)** mở rộng: adapter AWF/DF (cắt/streaming lúc load), đối chứng GPT-2 random-init,
   ablation logits so với embedding, ≥3 seed → mean ± std.
-- **P7** báo cáo: `docs/audit-report.md`, hình, bảng, hạn chế.
+  Xong khi: mỗi mục có bảng riêng, ghi rõ seed và cấu hình, kết quả báo mean ± std chứ không phải một lần chạy.
+- **P7 (chưa làm)** báo cáo: `docs/audit-report.md`, hình, bảng, hạn chế.
+  Xong khi: mọi con số trong báo cáo truy được về một dòng của `docs/experiment-log.md` và một file trong
+  `outputs/metrics/`; phần hạn chế nêu rõ khác biệt split so với paper và những gì chưa làm.
 
 ## 9. Quy ước
 - Python 3, `from __future__ import annotations`, type hint, hàm nhỏ thuần tuý, docstring ghi rõ
