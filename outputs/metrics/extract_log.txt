@@ -1,0 +1,18 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   7%|▋         | 10/148 [00:00<00:01, 95.44it/s]Loading weights:  15%|█▍        | 22/148 [00:00<00:01, 107.43it/s]Loading weights:  41%|████      | 61/148 [00:00<00:00, 231.37it/s]Loading weights: 100%|██████████| 148/148 [00:00<00:00, 404.14it/s]
+[transformers] [1mGPT2ForSequenceClassification LOAD REPORT[0m from: gpt2
+Key          | Status  | 
+-------------+---------+-
+score.weight | MISSING | 
+
+Notes:
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+checkpoint: outputs/checkpoints/ustc_gpt2_seed42.pt (epoch 3, valid_acc 0.9996)
+da trich 97115 mau trong 15.6 phut
+da luu feature -> outputs/features/ustc_seed42.npz (602 MB)
+da luu metrics -> outputs/metrics/ustc_gpt2_seed42.json
+  closed_train n= 39980 accuracy=0.9999
+  open_valid   n= 20000 (open-set: khong tinh accuracy)
+  closed_test  n=  8568 accuracy=0.9998
+  open_test    n= 20000 (open-set: khong tinh accuracy)
+  closed_valid n=  8567 accuracy=0.9997

@@ -1,0 +1,26 @@
+config: configs/ustc_gpt2_seed42.yaml | seed=42 | amp=bf16
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+train (closed_train): 39980 mau
+valid (closed_valid): 8567 mau
+test  (closed_test): 8568 mau
+Loading weights:   0%|          | 0/148 [00:00<?, ?it/s]Loading weights:   7%|▋         | 11/148 [00:00<00:01, 107.02it/s]Loading weights:  21%|██        | 31/148 [00:00<00:00, 155.06it/s]Loading weights:  59%|█████▉    | 87/148 [00:00<00:00, 329.66it/s]Loading weights: 100%|██████████| 148/148 [00:00<00:00, 413.73it/s]
+[transformers] [1mGPT2ForSequenceClassification LOAD REPORT[0m from: gpt2
+Key          | Status  | 
+-------------+---------+-
+score.weight | MISSING | 
+
+Notes:
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+device=cuda | trainable params=124.4M
+epoch 1/3  train_loss=0.2034  train_acc=0.9412  valid_loss=0.0270  valid_acc=0.9968  (22.8 phut)
+  -> checkpoint moi (valid_acc=0.9968)
+  -> da luu -> outputs/checkpoints/ustc_gpt2_seed42.pt
+epoch 2/3  train_loss=0.0104  train_acc=0.9983  valid_loss=0.0060  valid_acc=0.9989  (26.5 phut)
+  -> checkpoint moi (valid_acc=0.9989)
+  -> da luu -> outputs/checkpoints/ustc_gpt2_seed42.pt
+epoch 3/3  train_loss=0.0018  train_acc=0.9996  valid_loss=0.0020  valid_acc=0.9996  (22.5 phut)
+  -> checkpoint moi (valid_acc=0.9996)
+  -> da luu -> outputs/checkpoints/ustc_gpt2_seed42.pt
+best epoch: 3 | best valid acc: 0.9996
+da luu checkpoint -> outputs/checkpoints/ustc_gpt2_seed42.pt
+da luu metrics -> outputs/metrics/ustc_gpt2_seed42.json

@@ -26,8 +26,10 @@ Thumbs.db
 !/data/processed/**/metadata.json
 !/data/processed/**/README.md
 
-# Generated experiment artifacts
-/outputs/
+# Generated experiment artifacts: ignore binaries, keep small reports
+/outputs/*
+!/outputs/metrics/
+!/outputs/figures/
 /wandb/
 /runs/
 /logs/
