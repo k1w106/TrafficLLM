@@ -11,12 +11,16 @@ gdown "https://drive.google.com/uc?id=1-MVfxyHdQeUguBmYrIIw1jhMVSqxXQgO" -O data
 pip install -r requirements.txt
 
 # Chia sẻ artifact (chủ repo làm một lần, người khác không cần)
-# 1. GitHub > Releases > "Draft a new release", tag: p3-artifacts
-# 2. Upload đúng 2 file, giữ nguyên tên (mỗi file < 2 GB):
+# Cách nhanh: script tự tạo release + upload + in link
+GITHUB_TOKEN=ghp_xxx python3 scripts/publish_release.py
+# hoặc chạy không đặt biến môi trường, script sẽ hỏi token (không hiện ra màn hình)
+
+# Cách thủ công: GitHub > Releases > "Draft a new release", tag: p3-artifacts
+#   upload đúng 2 file, giữ nguyên tên (mỗi file < 2 GB):
 #      outputs/checkpoints/ustc_gpt2_seed42.pt   (475 MB)
 #      outputs/features/ustc_seed42.npz          (575 MB)
-# 3. Publish. Link tải có dạng:
-#      https://github.com/k1w106/TrafficLLM/releases/download/p3-artifacts/<tên file>
+# Link tải có dạng:
+#   https://github.com/k1w106/TrafficLLM/releases/download/p3-artifacts/<tên file>
 # Không dùng Git LFS (free 1 GB, pull một lần là hết quota).
 # Kiểm tra toàn vẹn bằng sha256 ghi trong README.md.
 
