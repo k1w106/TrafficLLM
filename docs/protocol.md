@@ -136,11 +136,24 @@ Viết **trước khi** cài đặt, để mọi con số trong báo cáo có ng
 | Khía cạnh | `reference` | `corrected` |
 |---|---|---|
 | Ngưỡng | phân vị 0,8 dạng nearest-rank như upstream (`TH_value=0.8`, loại ~20% known) | giữ 95% known (`keep_rate=0.95`) |
+| Số láng giềng `K` | 5 như upstream USTC (`--K_number 5`), **gồm cả chính class đang xét** | 5, **loại chính class đang xét** |
+| Mẫu dùng calibration K-LND | chỉ mẫu `closed_valid` **phân loại đúng**, score tính bằng nhánh láng giềng (giống upstream) | toàn bộ `closed_valid`, score cùng định nghĩa với lúc đánh giá |
 | Tập láng giềng của K-LND | **gồm cả chính class đang xét** (lỗi upstream: `Values[i][i]` luôn = 0 nên luôn được chọn) | loại chính nó |
-| K-LND 2/3 khi tính score | mẫu **closed** cộng trên *tất cả* class, mẫu **open** chỉ cộng trên K class (lỗi upstream) | cả hai dùng **cùng một** tập K |
+| K-LND 2/3 khi tính score | calibration/valid và `open_test` dùng K láng giềng; **`closed_test` cộng trên *tất cả* class** (bất đối xứng upstream) | cả `closed_test` lẫn `open_test` dùng **cùng một** tập K |
 | Class rỗng | `TH = 10` cho class 0, class sau lấy TH class trước (magic number) | fallback về phân vị toàn cục |
 | Mẫu số 0 (K-LND 3) | không chặn → NaN/inf | chặn bằng epsilon |
 | Nhiệt độ `T` | 1 | 1 (xem ghi chú bên dưới) |
+
+**Hệ quả của bất đối xứng `reference` (K-LND 2/3):** ngưỡng được học trên nhánh
+láng giềng nhưng lại áp lên `closed_test` tính bằng nhánh *tất cả* class, nên
+`FPR` trên `closed_test` gần 0 thay vì ~0,20; đồng thời score thô của known và
+open không cùng thang đo, làm `AUROC`/`AUPR`/`FPR@95TPR` bị thổi phồng. Đây là
+hành vi thật của upstream, không phải detector tốt hơn. Vì vậy khi đọc kết quả
+`reference` K-LND 2/3 phải so cạnh `corrected` và ghi rõ nguyên nhân.
+
+**MSP/Energy không có bản upstream.** Repo gốc chỉ cài K-LND; `reference` cho
+MSP/Energy chỉ là *operating point kiểu upstream* (phân vị 0,8), không phải tái
+lập code gốc. OpenMax cũng không có trong repo gốc, nên chỉ báo cáo `corrected`.
 
 **Vì sao cả hai chế độ dùng `T = 1`:** dự định ban đầu là chọn `T` bằng NLL trên
 `closed_valid`, nhưng với model này tiêu chí đó **suy biến**. Bằng chứng đo được trên
@@ -176,5 +189,25 @@ theo lớp. Khác biệt này được ghi rõ trong output.
 
 **Ghi chú về AUPR:** vì `|U| = 20.000` lớn hơn `|K| = 8.568`, prevalence ≈ 0,70 nên
 AUPR sẽ cao "tự nhiên"; luôn đọc kèm prevalence, không so sánh AUPR giữa hai tỉ lệ khác nhau.
+
+### OpenMax (chỉ `corrected`)
+
+Repo gốc không có code OpenMax, nên không tồn tại chế độ `reference` cho detector
+này. Cài đặt ở `src/trafficllm/openset/openmax.py`, chỉ dùng `closed_train` để fit
+và `closed_valid` để chọn ngưỡng; không nhìn dữ liệu open.
+
+| Thành phần | Định nghĩa |
+|---|---|
+| Không gian khoảng cách | `emb_last` (hidden state lớp cuối tại token cuối không pad) |
+| Mean mỗi class | Trung bình `emb_last` của mẫu `closed_train` **phân loại đúng** |
+| Weibull | Fit `weibull_min` với `floc=0` trên khoảng cách Euclid từ mẫu `closed_train` đúng tới mean class đó |
+| Hiệu chỉnh | Xếp hạng class theo logit giảm dần, lấy top `alpha = 3`; class hạng `r` bị phạt `log(1 − w_r)` với `w_r` là CDF Weibull của khoảng cách |
+| Unknown logit | `logsumexp(logit_top + log(w))` trên top `alpha` |
+| Score | `1 − max p_known` với `p = softmax([logits_revised, unknown_logit])`; lấy max **chỉ trên 12 lớp known** để xác suất unknown cao cho score cao |
+| Ngưỡng | `keep_rate = 0,95`, hiệu chỉnh trên `closed_valid` như các detector khác |
+
+Fallback: class không có mẫu `closed_train` đúng, hoặc fit Weibull thất bại/suy biến,
+thì `w = 0` cho class đó (không hiệu chỉnh) và mean lấy centroid toàn cục. Cách này
+tránh NaN và chia 0 nhưng được ghi rõ trong output (`openmax` chỉ có một bản `corrected`).
 
 

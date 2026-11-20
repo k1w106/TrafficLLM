@@ -22,7 +22,7 @@ OpenMax**. Chi tiết thiết kế: `AGENTS.md` và `docs/protocol.md`.
 | P1 | Manifest USTC (12 known / 8 open, seed 42) | xong |
 | P2 | Encoding không dùng nhãn + báo cáo độ dài token | xong |
 | P3 | Fine-tune GPT-2 + cache feature cho 97.115 mẫu | xong |
-| P4 | Detector open-set + metrics trên cache | **đang làm** — còn OpenMax + runner + test |
+| P4 | Detector open-set + metrics trên cache | xong — MSP, Energy, K-LND 1/2/3, OpenMax; runner + test + docs |
 | P5 | Audit `reference` vs `corrected` trên cùng cache, run DC riêng | chưa làm |
 | P6 | Mở rộng: AWF/DF, GPT-2 random-init, logits vs embedding, ≥3 seed | chưa làm |
 | P7 | Báo cáo `docs/audit-report.md`, hình, bảng, hạn chế | chưa làm |
@@ -140,33 +140,51 @@ python3 scripts/analyze_token_length.py
 - Closed-set: `closed_valid` 0,999650; `closed_test` **0,999767** (8.566/8.568).
 - Cache feature: accuracy tính lại từ `logits` khớp chính xác con số lúc train.
 
+### P4 — open-set trên cache
+
+Chạy `python3 scripts/run_openset.py --config configs/openset_ustc_seed42.yaml`
+(16,4 s trên CPU, không chạy lại GPT-2). K=5, `keep_rate` 0,8 (`reference`) / 0,95
+(`corrected`), OpenMax fit trên `closed_train`.
+
+| Detector | Mode | CCR | UCR | AUROC | FPR@95TPR | OSCR |
+|---|---|---:|---:|---:|---:|---:|
+| K-LND 1 | corrected | 0,9437 | 0,7944 | 0,9584 | 0,1912 | 0,9437 |
+| K-LND 2 | corrected | 0,9497 | 0,6960 | 0,9291 | 0,3707 | 0,9497 |
+| K-LND 3 | corrected | 0,9447 | 0,7627 | 0,9600 | 0,2045 | 0,9447 |
+| OpenMax | corrected | 0,9483 | 0,6674 | 0,8887 | 0,5158 | 0,9483 |
+
+- `reference` K-LND 1 (cùng định nghĩa score ở hai nhánh): CCR 0,8081 / UCR 0,9284.
+- `reference` K-LND 2/3 có FPR≈0 và AUROC≈1,0 **do bất đối xứng nhánh score của
+  upstream** (ngưỡng học trên nhánh láng giềng, `closed_test` lại cộng trên tất cả
+  class) — không phải detector tốt hơn. Chi tiết: `docs/protocol.md`.
+- Class open 2 bị phát hiện rất kém ở mọi detector (UCR 0,00–0,29); đây là điểm
+  cần nêu trong audit P5/P7.
+- Output: `outputs/metrics/openset_ustc_seed42.json` + `.csv`; 31 test pass.
+
 Số liệu chi tiết và cách đọc: `docs/protocol.md`, `docs/experiment-log.md`.
 
-## Tiếp tục phát triển (đang ở P4)
+## Tiếp tục phát triển (đang ở P5)
 
-Code P4 hiện có:
+Code P4 đã có:
 
 | File | Vai trò |
 |---|---|
 | `src/trafficllm/openset/scoring.py` | MSP, Energy, class means, neighbor sets, K-LND 1/2/3 |
 | `src/trafficllm/openset/calibration.py` | ngưỡng phân vị per-class, hiệu chỉnh **chỉ** từ `closed_valid` |
+| `src/trafficllm/openset/openmax.py` | OpenMax fit trên `closed_train`, chỉ báo cáo `corrected` |
 | `src/trafficllm/evaluation/metrics.py` | AUROC, AUPR, FPR@95TPR, macro-F1, confusion matrix |
-| `docs/protocol.md` | định nghĩa metric, bảng khác biệt `reference` / `corrected` |
+| `scripts/run_openset.py` + `configs/openset_ustc_seed42.yaml` | chạy 6 detector trên cache, xuất JSON + CSV |
+| `tests/test_openset_detectors.py`, `tests/test_metrics.py` | test Gaussian + metric |
+| `docs/protocol.md` | định nghĩa metric, bảng khác biệt `reference` / `corrected`, OpenMax |
 
-Việc còn lại, làm đúng thứ tự:
+Việc tiếp theo — **P5 audit**, làm đúng thứ tự:
 
-1. **OpenMax** → `src/trafficllm/openset/openmax.py`
-   Mean embedding mỗi class từ `closed_train` (`emb_last`), fit Weibull trên `closed_valid`,
-   hiệu chỉnh logits theo rank `alpha`, score = `1 − max p_revised`. Không có bản upstream nên
-   chỉ báo cáo `corrected`.
-2. **Runner** → `scripts/run_openset.py` + `configs/openset_ustc_seed42.yaml`
-   Nạp cache + manifest, chạy 5 detector × 2 chế độ, xuất `outputs/metrics/openset_ustc_seed42.json`
-   (đủ 9 metric, confusion 13×13, tỉ lệ theo 8 class open, độ nhạy T của MSP/Energy) và bản `.csv`.
-3. **Test** → `tests/test_openset_detectors.py`
-   Dữ liệu Gaussian giả lập: hướng score, chiều ngưỡng, self-neighbor, fallback class rỗng,
-   mẫu số 0, ngưỡng per-class.
-4. **Chạy thật + ghi log**: thêm một dòng vào `docs/experiment-log.md` (ngày, config, seed, lệnh, metric chính).
-5. **Commit**: `P4: ...`, không commit `data/`, `outputs/checkpoints/`, `outputs/features/`.
+1. Chạy lại `run_openset.py` và tổng hợp bảng `reference` vs `corrected` cho cả 6 detector.
+2. Giải thích từng chênh lệch: self-neighbor, bất đối xứng closed/open của K-LND 2/3,
+   chiều phân vị, operating point 0,8 vs 0,95.
+3. Chuẩn bị run DC riêng (leakage nằm ở encoding nên cần lần train thứ hai), đánh dấu
+   rõ là run phụ; dùng thiết lập 8/20 class known như paper.
+4. Ghi mọi kết quả vào `docs/experiment-log.md`; không báo con số chưa tính.
 
 Quy ước không được vi phạm khi làm tiếp (chi tiết: `AGENTS.md` §6):
 

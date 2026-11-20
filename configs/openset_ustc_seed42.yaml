@@ -1,0 +1,28 @@
+# P4 — chạy detector open-set trên cache feature USTC seed 42.
+experiment: openset_ustc_seed42
+phase: P4
+seed: 42
+
+data:
+  manifest_path: data/processed/ustc_seed42/manifest.csv
+  features_path: outputs/features/ustc_seed42.npz
+  metadata_path: data/processed/ustc_seed42/metadata.json
+  num_labels: 12
+  unknown_label: 12
+
+openset:
+  neighbors_k: 5              # upstream USTC: --K_number 5
+  temperature: 1.0
+  temperature_grid: [0.5, 1.0, 2.0, 5.0, 10.0]
+  reference_keep_rate: 0.8    # upstream --TH_value 0.8
+  corrected_keep_rate: 0.95
+  reference_magic_empty: true
+  balanced_f1_seed: 42
+  openmax:
+    enabled: true
+    alpha: 3
+    min_class_samples: 2
+
+metrics:
+  output_json: outputs/metrics/openset_ustc_seed42.json
+  output_csv: outputs/metrics/openset_ustc_seed42.csv

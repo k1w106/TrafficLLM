@@ -60,9 +60,11 @@ def macro_f1_binary(predicted_unknown: np.ndarray, is_unknown: np.ndarray) -> fl
 
     scores = []
     for label in (False, True):
-        tp = float(np.sum(predicted_unknown & (is_unknown == label)))
-        fp = float(np.sum(predicted_unknown & (is_unknown != label)))
-        fn = float(np.sum((~predicted_unknown) & (is_unknown == label)))
+        predicted_label = predicted_unknown if label else ~predicted_unknown
+        true_label = is_unknown if label else ~is_unknown
+        tp = float(np.sum(predicted_label & true_label))
+        fp = float(np.sum(predicted_label & ~true_label))
+        fn = float(np.sum(~predicted_label & true_label))
         denominator = 2.0 * tp + fp + fn
         scores.append(0.0 if denominator == 0.0 else 2.0 * tp / denominator)
     return float(np.mean(scores))

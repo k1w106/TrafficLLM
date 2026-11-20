@@ -97,18 +97,18 @@ Trước khi code, nêu kế hoạch trong ≤10 dòng. Chỉ đụng vào file 
     `emb_mean` = trung bình trên các token không phải pad **có áp attention mask**. Join với manifest bằng `sample_id`.
   - Xong khi: cùng seed cho cùng kết quả hai lần; có accuracy trên closed_test; lưu checkpoint + config.
   - Không tự chạy job huấn luyện dài hơn ~10 phút: đưa cho user lệnh chính xác kèm thời gian ước lượng.
-- **P4 (đang làm)** detector + metrics trên cache: MSP, Energy, K-LND 1/2/3 (cả hai chế độ), OpenMax; hiệu chỉnh ngưỡng từ
+- **P4 ✅** detector + metrics trên cache: MSP, Energy, K-LND 1/2/3 (cả hai chế độ), OpenMax; hiệu chỉnh ngưỡng từ
   `closed_valid` (ví dụ giữ lại 95% mẫu known); metrics: closed accuracy, unknown recall, AUROC,
   FPR@95%TPR, AUPR, OSCR, balanced F1 (tỉ lệ unknown tự nhiên và 1:1), confusion matrix, tỉ lệ phát hiện theo từng class open.
   Viết định nghĩa metric vào `docs/protocol.md` **trước khi** cài đặt. Unit-test detector trên dữ liệu Gaussian giả lập.
-  Đã có: anomaly score MSP/Energy/K-LND 1-2-3, hiệu chỉnh ngưỡng, metric cơ bản trong
-  `src/trafficllm/{openset,evaluation}/`.
-  Còn thiếu: **OpenMax**, `scripts/run_openset.py`, unit-test Gaussian, mục OpenMax trong `docs/protocol.md`,
-  dòng P4 trong `docs/experiment-log.md`.
+  Đã có: anomaly score MSP/Energy/K-LND 1-2-3 + OpenMax (`src/trafficllm/openset/`), hiệu chỉnh ngưỡng,
+  metric (`src/trafficllm/evaluation/metrics.py`), runner `scripts/run_openset.py`,
+  config `configs/openset_ustc_seed42.yaml`, test Gaussian + metric, mục OpenMax trong `docs/protocol.md`,
+  dòng P4 trong `docs/experiment-log.md`, kết quả `outputs/metrics/openset_ustc_seed42.{json,csv}`.
 - **P5 (chưa làm)** audit: chạy `reference` so với `corrected` trên cùng cache và giải thích mọi chênh lệch.
   DC cần **lần huấn luyện thứ hai** (leakage nằm ở encoding nên không dùng chung cache feature được).
   Thêm một run riêng, đặt tên rõ ràng, theo thiết lập của paper (paper nói 40% số class là closed = 8/20).
-  Xong khi: có bảng so sánh hai chế độ cho cả 5 detector; mỗi chênh lệch truy được về nguyên nhân cụ thể
+  Xong khi: có bảng so sánh hai chế độ cho cả 6 detector; mỗi chênh lệch truy được về nguyên nhân cụ thể
   (self-neighbor, bất đối xứng closed/open, chiều phân vị, operating point); run DC được đánh dấu rõ là run phụ.
 - **P6 (chưa làm)** mở rộng: adapter AWF/DF (cắt/streaming lúc load), đối chứng GPT-2 random-init,
   ablation logits so với embedding, ≥3 seed → mean ± std.
