@@ -1,0 +1,27 @@
+# P5 (run phu) — audit encoding DC: reference (co nhan) vs corrected (label-free).
+experiment: audit_dc_seed42
+phase: P5
+seed: 42
+
+data:
+  manifest_path: data/processed/dc_seed42/manifest.csv
+  reference_features_path: outputs/features/dc_seed42_reference.npz
+  corrected_features_path: outputs/features/dc_seed42_corrected.npz
+  num_labels: 4
+  unknown_label: 4
+
+openset:
+  neighbors_k: 4              # upstream DC: --K_number 4
+  temperature: 1.0
+  reference_keep_rate: 0.9    # upstream DC: --TH_value 0.9
+  corrected_keep_rate: 0.95
+  reference_magic_empty: true
+  balanced_f1_seed: 42
+  openmax:
+    enabled: true
+    alpha: 3
+    min_class_samples: 2
+
+audit:
+  output_json: outputs/metrics/audit_dc_seed42.json
+  output_csv: outputs/metrics/audit_dc_seed42.csv

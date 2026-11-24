@@ -1,0 +1,22 @@
+# P6 — ablation feature cho K-LND trên cache USTC seed 42.
+experiment: ablation_features_ustc_seed42
+phase: P6
+seed: 42
+
+data:
+  manifest_path: data/processed/ustc_seed42/manifest.csv
+  features_path: outputs/features/ustc_seed42.npz
+  num_labels: 12
+  unknown_label: 12
+
+ablation:
+  features: [logits, emb_last, emb_mean]
+  methods: [1, 2, 3]
+  neighbors_k: 5
+  keep_rate: 0.95
+  balanced_f1_seed: 42
+  mode: corrected
+
+output:
+  json_path: outputs/metrics/ablation_ustc_seed42.json
+  csv_path: outputs/metrics/ablation_ustc_seed42.csv

@@ -1,0 +1,41 @@
+# P5 (run phu) — fine-tune GPT-2 tren DC voi encoding reference (co nhan).
+experiment: dc_gpt2_seed42_reference
+phase: P5
+mode: reference
+seed: 42
+
+data:
+  encoded_path: data/processed/dc_seed42/encoded_reference_gpt2.parquet
+  text_column: text
+  label_column: model_label
+  train_partition: closed_train
+  valid_partition: closed_valid
+  test_partition: closed_test
+
+model:
+  name: gpt2
+  num_labels: 4
+  max_len: 1024
+  attn_implementation: eager
+
+train:
+  batch_size: 2          # DC bi truncate o 1024 token -> batch nho de vua 6 GB
+  eval_batch_size: 4
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  adam_eps: 1.0e-8
+  epochs: 3
+  warmup_steps: 0
+  grad_clip: 1.0
+  amp: bf16
+  deterministic: true
+  num_workers: 0
+  checkpoint_dir: outputs/checkpoints
+  checkpoint_name: dc_gpt2_seed42_reference.pt
+
+features:
+  output_path: outputs/features/dc_seed42_reference.npz
+  batch_size: 32
+
+metrics:
+  output_path: outputs/metrics/dc_gpt2_seed42_reference.json

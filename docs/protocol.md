@@ -141,8 +141,16 @@ Viết **trước khi** cài đặt, để mọi con số trong báo cáo có ng
 | Tập láng giềng của K-LND | **gồm cả chính class đang xét** (lỗi upstream: `Values[i][i]` luôn = 0 nên luôn được chọn) | loại chính nó |
 | K-LND 2/3 khi tính score | calibration/valid và `open_test` dùng K láng giềng; **`closed_test` cộng trên *tất cả* class** (bất đối xứng upstream) | cả `closed_test` lẫn `open_test` dùng **cùng một** tập K |
 | Class rỗng | `TH = 10` cho class 0, class sau lấy TH class trước (magic number) | fallback về phân vị toàn cục |
-| Mẫu số 0 (K-LND 3) | không chặn → NaN/inf | chặn bằng epsilon |
+| Mẫu số 0 (K-LND 3) | không chặn → NaN/inf (đã cài đúng: `guard_denominator=False`) | chặn bằng epsilon |
 | Nhiệt độ `T` | 1 | 1 (xem ghi chú bên dưới) |
+
+**Phạm vi `reference`:** `reference` tái hiện **encoding + detector + calibration**
+của upstream, không tái hiện cách upstream chọn class known/open hay split.
+Project dùng known ngẫu nhiên seed 42 (12/20 cho USTC, 4/10 cho DC) và split
+stratified; upstream dùng known = `y < num_labels` (12 cho USTC, 4 cho DC theo
+first-4) và split không stratified. Vì vậy chênh lệch tuyệt đối với số trong
+`results_*.txt` của upstream là *discrepancy, chưa xác minh nguyên nhân*, không
+phải "không tái lập được".
 
 **Hệ quả của bất đối xứng `reference` (K-LND 2/3):** ngưỡng được học trên nhánh
 láng giềng nhưng lại áp lên `closed_test` tính bằng nhánh *tất cả* class, nên
@@ -211,3 +219,157 @@ thì `w = 0` cho class đó (không hiệu chỉnh) và mean lấy centroid toà
 tránh NaN và chia 0 nhưng được ghi rõ trong output (`openmax` chỉ có một bản `corrected`).
 
 
+
+## Audit P5: `reference` vs `corrected` (USTC)
+
+### Thiết kế 4 ô
+
+`scripts/run_audit.py --config configs/openset_ustc_seed42.yaml` chạy cùng một
+cache feature với 4 biến thể, để tách **sửa lỗi** khỏi **đổi operating point**:
+
+| Biến thể | Mode | `keep_rate` | Ý nghĩa |
+|---|---|---:|---|
+| `reference_08` | reference | 0,8 | mặc định paper/repo |
+| `reference_095` | reference | 0,95 | chỉ đổi operating point |
+| `corrected_08` | corrected | 0,8 | chỉ sửa lỗi |
+| `corrected_095` | corrected | 0,95 | cả hai |
+
+Output: `outputs/metrics/audit_ustc_seed42.{json,csv}`. Chạy CPU ~15,6 s.
+
+### Kết quả chính
+
+| Detector | Ref08 CCR | Ref08 UCR | Ref08 AUROC | Ref08 FPR95 | Ref08 OSCR | Corr095 CCR | Corr095 UCR | Corr095 AUROC | Corr095 FPR95 | Corr095 OSCR |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| MSP | 0,8057 | 0,8277 | 0,8876 | 0,7443 | 0,8057 | 0,9545 | 0,7710 | 0,8876 | 0,7443 | 0,9545 |
+| Energy | 0,8110 | 0,8183 | 0,9148 | 0,3979 | 0,8110 | 0,9503 | 0,7513 | 0,9148 | 0,3979 | 0,9503 |
+| K-LND 1 | 0,8081 | 0,9284 | 0,9584 | 0,1912 | 0,8081 | 0,9437 | 0,7944 | 0,9584 | 0,1912 | 0,9437 |
+| K-LND 2 | 0,9998 | 0,8276 | 1,0000 | 0,0000 | 0,9999 | 0,9497 | 0,6960 | 0,9291 | 0,3707 | 0,9497 |
+| K-LND 3 | 0,9985 | 0,9090 | 0,9996 | 0,0006 | 0,9986 | 0,9447 | 0,7627 | 0,9600 | 0,2045 | 0,9447 |
+| OpenMax | — | — | — | — | — | 0,9483 | 0,6674 | 0,8887 | 0,5158 | 0,9483 |
+
+Tách riêng hai tác nhân (Δ = giá trị sau − giá trị trước):
+
+| Detector | Δ bug-fix (ref08 → corr08): CCR / UCR / AUROC | Δ operating point (corr08 → corr095): CCR / UCR / AUROC |
+|---|---|---|
+| MSP | −0,0006 / +0,0001 / 0,0000 | +0,1494 / −0,0569 / 0,0000 |
+| Energy | −0,0008 / 0,0000 / 0,0000 | +0,1401 / −0,0671 / 0,0000 |
+| K-LND 1 | −0,0008 / +0,0001 / 0,0000 | +0,1364 / −0,1342 / 0,0000 |
+| K-LND 2 | −0,1922 / +0,0425 / −0,0709 | +0,1422 / −0,1742 / 0,0000 |
+| K-LND 3 | −0,1877 / +0,0002 / −0,0395 | +0,1339 / −0,1465 / 0,0000 |
+| OpenMax | — | +0,1440 / −0,1200 / 0,0000 |
+
+### Chẩn đoán và cách đọc
+
+| Chẩn đoán | Kết quả |
+|---|---|
+| `same_branch` K-LND 2 | AUROC 0,9118 / FPR95 0,4664 / CCR 0,8088 / UCR 0,8276 (so với 1,0000 / 0,0000 / 0,9998 / 0,8276 khi `closed_test` cộng tất cả class) |
+| `same_branch` K-LND 3 | AUROC 0,9585 / FPR95 0,2200 / CCR 0,8134 / UCR 0,9090 (so với 0,9996 / 0,0006 / 0,9985 / 0,9090) |
+| `self_neighbor` K-LND 2 | without − with: ΔAUROC +0,0173, ΔFPR95 −0,0957, ΔCCR +0,0009, ΔUCR +0,0054 |
+| `self_neighbor` K-LND 3 | without − with: ΔAUROC +0,0015, ΔFPR95 −0,0155, ΔCCR −0,0013, ΔUCR +0,0073 |
+| `self_neighbor` K-LND 1 | 0 ở mọi metric (method 1 không dùng tập láng giềng) |
+| `calibration_correct_only` | Δ ≈ 0; K-LND 2 chỉ lệch UCR −0,0007 vì correct-only chỉ dùng 8.564/8.567 mẫu valid phân loại đúng |
+| `msp_saturation` | top-prob median 0,9999997; MSP median 2,79e−7; **80,35%** valid có MSP < 1e−6; ngưỡng median ~9,4e−7 (ref) / 1,65e−6 (corr) |
+
+- **MSP/Energy và K-LND 1:** sửa lỗi gần như không đổi kết quả; chênh lệch
+  `reference_08` → `corrected_095` chủ yếu là do đổi `keep_rate` 0,8 → 0,95.
+  Với MSP, ngưỡng hiệu chỉnh rơi vào vùng bão hoà ~1e−6 nên `AUROC`/`FPR95`
+  không đổi; `CCR` tăng và `UCR` giảm đúng như thiết kế operating point.
+- **K-LND 2/3:** `reference_08` có `AUROC ≈ 1` và `FPR95 ≈ 0` **không phải vì
+  detector tốt hơn**. Khi ép `closed_test` dùng cùng nhánh K láng giềng
+  (`same_branch`), `AUROC` tụt còn 0,9118 / 0,9585 và `FPR95` tăng lên
+  0,4664 / 0,2200. Phần "đẹp" còn lại là do bất đối xứng nhánh score của upstream.
+- **Self-neighbor:** loại class đang xét khỏi tập láng giềng làm K-LND 2 tăng
+  `AUROC` +0,0173 và giảm `FPR95` −0,0957; K-LND 3 nhỏ hơn. Đây là lỗi thật nhưng
+  không phải nguyên nhân chính của `AUROC ≈ 1`.
+- **Calibration correct-only:** gần như vô hại trên USTC (chỉ 3 mẫu khác), nên
+  không thể quy chênh lệch lớn cho lỗi này.
+- **Kết luận:** không so trực tiếp `AUROC` của `reference` K-LND 2/3 với
+  `corrected`; dùng `same_branch` hoặc bảng `corrected` khi kết luận detector.
+
+## DC (P5, run phụ)
+
+DC dùng để audit **label leakage trong encoding**, không phải kết quả chính.
+
+- Dữ liệu: 10 class video YouTube; mỗi trace 500 giá trị packet-count; 3.198 trace
+  (2.509 train / 50 valid / 639 test gốc). Ta gộp rồi split lại stratified, seed 42:
+  4 class known / 6 class open (40% closed như paper), `closed_train` 894,
+  `closed_valid` 192, `closed_test` 192, `open_valid` 960, `open_test` 960.
+- `reference`: mỗi giá trị `x` → pattern dài `floor(x/divisor)+1`, số bit 1 = độ
+  dài pattern, bit 1/0 **phụ thuộc nhãn** (tái hiện upstream). Upstream **không cắt
+  pattern ở 32 bit** (chỉ pad thêm 0 khi ngắn hơn) và đổi cả chunk cuối nếu không
+  đủ 4 bit; ta đã sửa `_reference_pattern`/`_bits_to_hex` để khớp đúng hai chi tiết
+  này. Code upstream dùng `divisor=50`, paper ghi 40; ta để `divisor` cấu hình
+  được, mặc định 50 cho reference.
+- `corrected`: cùng 32 bit / hex / space / `divisor`, nhưng pattern label-free:
+  dồn đúng số bit 1 về bên trái rồi phần còn lại là 0. Đây là thay đổi tối thiểu
+  để cô lập leakage, không thiết kế lại representation.
+- Token length (GPT-2): min 500, p50 2.012, p95 2.390, max 3.923;
+  **99,78%** trace vượt `max_len=1024` và bị truncate. Reference và corrected có
+  cùng phân bố độ dài, nên so sánh vẫn công bằng nhưng chỉ trên phần prefix được
+  model nhìn thấy. Đây là hạn chế phải nêu ở P7.
+- Audit DC (`scripts/run_dc_audit.py`) so 3 evaluation:
+  `reference_upstream` (keep 0,9, calibration correct-only, `magic_empty`),
+  `reference_corrected_protocol` (cùng cache reference, keep 0,95, calibration
+  toàn bộ valid, K-LND cùng nhánh), `corrected` (cache corrected + protocol corrected).
+  `delta_encoding_isolated = corrected − reference_corrected_protocol` đo riêng
+  tác động leakage, không lẫn với sửa protocol.
+- Trạng thái: manifest + encoding + config + script + **kết quả thật** đã xong.
+  Train reference: best epoch 2, `closed_valid` 0,9948, `closed_test` 1,0000;
+  train corrected: best epoch 3, `closed_valid` 0,8229, `closed_test` 0,7812.
+  Feature: `outputs/features/dc_seed42_{reference,corrected}.npz` (20 MB mỗi bản).
+
+### Kết quả DC
+
+| Evaluation | Detector | CCR | UCR | AUROC | FPR95 | OSCR |
+|---|---|---:|---:|---:|---:|---:|
+| reference_upstream | MSP | 0,9167 | 0,8198 | 0,5518 | 0,7917 | 0,9167 |
+| reference_upstream | Energy | 0,9271 | 0,6094 | 0,6934 | 0,9323 | 0,9271 |
+| reference_upstream | K-LND 1 | 0,9167 | 0,6833 | 0,9137 | 0,4219 | 0,9167 |
+| reference_upstream | K-LND 2 | 0,9062 | 0,7198 | 0,8843 | 0,4896 | 0,9062 |
+| reference_upstream | K-LND 3 | 0,9115 | 0,6865 | 0,9125 | 0,4219 | 0,9115 |
+| reference_corrected_protocol | MSP | 0,9531 | 0,7833 | 0,5518 | 0,7917 | 0,9531 |
+| reference_corrected_protocol | Energy | 0,9479 | 0,5979 | 0,6934 | 0,9323 | 0,9479 |
+| reference_corrected_protocol | K-LND 1 | 0,9427 | 0,6542 | 0,9137 | 0,4219 | 0,9427 |
+| reference_corrected_protocol | K-LND 2 | 0,9427 | 0,6594 | 0,8843 | 0,4896 | 0,9427 |
+| reference_corrected_protocol | K-LND 3 | 0,9427 | 0,6677 | 0,9125 | 0,4219 | 0,9427 |
+| reference_corrected_protocol | OpenMax | 0,9583 | 0,7427 | 0,9572 | 0,2396 | 0,9583 |
+| corrected | MSP | 0,7604 | 0,1167 | 0,6817 | 0,8177 | 0,8355 |
+| corrected | Energy | 0,7500 | 0,1271 | 0,6575 | 0,7031 | 0,8229 |
+| corrected | K-LND 1 | 0,7604 | 0,1042 | 0,6429 | 0,9115 | 0,8418 |
+| corrected | K-LND 2 | 0,7604 | 0,0917 | 0,7075 | 0,6927 | 0,8418 |
+| corrected | K-LND 3 | 0,7604 | 0,0917 | 0,6590 | 0,8802 | 0,8418 |
+| corrected | OpenMax | 0,7552 | 0,1094 | 0,6028 | 0,9115 | 0,8386 |
+
+Tác động riêng của encoding (corrected − reference_corrected_protocol):
+
+| Detector | ΔCCR | ΔUCR | ΔAUROC | ΔFPR95 | ΔOSCR |
+|---|---:|---:|---:|---:|---:|
+| MSP | −0,1927 | −0,6667 | **+0,1299** | +0,0260 | −0,1176 |
+| Energy | −0,1979 | −0,4708 | −0,0359 | −0,2292 | −0,1250 |
+| K-LND 1 | −0,1823 | −0,5500 | −0,2708 | +0,4896 | −0,1009 |
+| K-LND 2 | −0,1823 | −0,5677 | −0,1768 | +0,2031 | −0,1009 |
+| K-LND 3 | −0,1823 | −0,5760 | −0,2534 | +0,4583 | −0,1009 |
+| OpenMax | −0,2031 | −0,6333 | −0,3544 | +0,6719 | −0,1197 |
+
+### Đọc kết quả DC
+
+- **Leakage làm open-set "dễ" hơn rất nhiều.** Cùng protocol, bỏ nhãn khỏi
+  encoding làm UCR rơi từ 0,60–0,82 xuống 0,09–0,13 ở mọi detector; CCR cũng
+  giảm ~0,18–0,20. Đây là bằng chứng định lượng cho lỗi label leakage: mẫu open
+  mang pattern riêng của class chưa thấy, nên bị reject dễ.
+- **Leakage cũng làm closed-set dễ hơn.** `closed_test` accuracy 1,0000 (reference)
+  vs 0,7812 (corrected). Vì vậy không được đọc 0,99+ của reference là năng lực
+  biểu diễn thật.
+- **MSP là ngoại lệ về AUROC:** AUROC tăng +0,1299 khi bỏ leakage (0,5518 →
+  0,6817) nhưng UCR vẫn sụp (−0,6667). Nghĩa là leakage không nhất thiết làm
+  *ranking toàn cục* tốt hơn; nó làm *ngưỡng per-class* reject open dễ hơn.
+  Đây là lý do phải đọc AUROC và UCR/OSCR cùng nhau, không thay thế nhau.
+- **K-LND/OpenMax:** cả AUROC lẫn UCR đều giảm sau khi bỏ leakage (K-LND1
+  AUROC 0,9137 → 0,6429; OpenMax 0,9572 → 0,6028), nên với các detector này
+  leakage thổi phồng cả ranking lẫn operating point.
+- **Phát hiện theo class open:** reference rất cao ở class 1, 2 (≈0,99–1,00),
+  class 8 (0,71–0,97) nhưng thấp ở class 3, 9 (0,04–0,67); corrected gần như đều
+  ~0,03–0,20. Tác động leakage phụ thuộc class, không đồng đều.
+- **Kết luận:** DC chỉ là run phụ audit. Số reference không dùng làm kết quả
+  chính; số corrected cho thấy open-set trên DC khó hơn nhiều khi không có nhãn
+  trong encoding. Cần nêu truncation 99,78% >1024 token khi so với paper.

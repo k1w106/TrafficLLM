@@ -26,3 +26,7 @@ openset:
 metrics:
   output_json: outputs/metrics/openset_ustc_seed42.json
   output_csv: outputs/metrics/openset_ustc_seed42.csv
+
+audit:
+  output_json: outputs/metrics/audit_ustc_seed42.json
+  output_csv: outputs/metrics/audit_ustc_seed42.csv

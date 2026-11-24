@@ -1,0 +1,41 @@
+{
+  "dataset": "DC",
+  "source_dir": "data/raw/trafficllm_reference/trafficllm_data/DC",
+  "seed": 42,
+  "known_mode": "random",
+  "known_count": 4,
+  "known_classes": [
+    0,
+    4,
+    5,
+    6
+  ],
+  "open_classes": [
+    1,
+    2,
+    3,
+    7,
+    8,
+    9
+  ],
+  "unknown_model_label": 4,
+  "class_to_model_label": {
+    "0": 0,
+    "4": 1,
+    "5": 2,
+    "6": 3
+  },
+  "n_samples": 3198,
+  "n_classes": 10,
+  "feature_shape": [
+    3198,
+    500
+  ],
+  "split_sizes": {
+    "open_test": 960,
+    "open_valid": 960,
+    "closed_train": 894,
+    "closed_valid": 192,
+    "closed_test": 192
+  }
+}

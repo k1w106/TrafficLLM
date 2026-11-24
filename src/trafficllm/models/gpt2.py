@@ -93,10 +93,29 @@ def build_model(
     num_labels: int,
     device: torch.device,
     attn_implementation: str = "eager",
+    pretrained: bool = True,
 ) -> GPT2ForSequenceClassification:
-    model = GPT2ForSequenceClassification.from_pretrained(
-        name, num_labels=num_labels, attn_implementation=attn_implementation
-    )
+    """Tạo model; ``pretrained=False`` = cùng kiến trúc nhưng weight random.
+
+    Random-init dùng ``GPT2Config.from_pretrained(name)`` (chỉ đọc config, không
+    đọc weight) rồi khởi tạo ``GPT2ForSequenceClassification``. Đây là đối chứng
+    P6: nếu fine-tune từ pretrained tốt hơn random-init thì lợi ích đến từ
+    pretraining, không chỉ từ kiến trúc.
+    """
+    if pretrained:
+        model = GPT2ForSequenceClassification.from_pretrained(
+            name, num_labels=num_labels, attn_implementation=attn_implementation
+        )
+    else:
+        from transformers import GPT2Config
+
+        model_config = GPT2Config.from_pretrained(name)
+        model_config.num_labels = num_labels
+        model_config.attn_implementation = attn_implementation
+        # transformers 5 đọc ``_attn_implementation`` khi khởi tạo trực tiếp;
+        # nếu chỉ set thuộc tính công khai thì model vẫn rơi về sdpa (không tất định).
+        model_config._attn_implementation = attn_implementation
+        model = GPT2ForSequenceClassification(model_config)
     model.config.pad_token_id = model.config.eos_token_id
     return model.to(device)
 

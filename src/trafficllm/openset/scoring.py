@@ -47,13 +47,31 @@ def pairwise_distances(x: np.ndarray, means: np.ndarray, chunk: int = 8192) -> n
     return out
 
 
+def _resolve_predicted(features: np.ndarray, predicted: np.ndarray | None) -> np.ndarray:
+    """Nhãn dự đoán dùng để chọn mẫu "đúng" và lớp của ngưỡng.
+
+    Với ablation feature, `features` có thể là embedding trong khi lớp dự đoán
+    vẫn lấy từ logits của model. Truyền `predicted` riêng để giữ nguyên lớp dự
+    đoán giữa các feature.
+    """
+    if predicted is None:
+        return np.asarray(features).argmax(axis=1)
+    return np.asarray(predicted)
+
+
 def class_means(
-    logits: np.ndarray,
+    features: np.ndarray,
     labels: np.ndarray,
     num_labels: int,
     mode: str = "corrected",
+    predicted: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Vector trung bình mỗi lớp, tính trên mẫu được phân loại **đúng** (như upstream).
+
+    `features` là không gian dùng để tính mean (logits hoặc embedding). Nếu
+    `predicted` được truyền, lớp dự đoán lấy từ đó thay vì `features.argmax`;
+    nhờ vậy ablation có thể so sánh logits với embedding mà vẫn dùng cùng một
+    lớp dự đoán.
 
     Trả về `(means, counts)`. Ở `corrected`, class rỗng được thay bằng centroid
     toàn cục để tránh chia 0; ở `reference` giữ nguyên NaN như upstream.
@@ -61,18 +79,19 @@ def class_means(
     if mode not in {"reference", "corrected"}:
         raise ValueError(f"mode khong hop le: {mode}")
 
-    logits = np.asarray(logits, dtype=np.float64)
+    features = np.asarray(features, dtype=np.float64)
     labels = np.asarray(labels)
-    correct = logits.argmax(axis=1) == labels
+    predicted = _resolve_predicted(features, predicted)
+    correct = predicted == labels
 
-    sums = np.zeros((num_labels, logits.shape[1]), dtype=np.float64)
+    sums = np.zeros((num_labels, features.shape[1]), dtype=np.float64)
     counts = np.zeros(num_labels, dtype=np.int64)
     if correct.any():
-        np.add.at(sums, labels[correct], logits[correct])
+        np.add.at(sums, labels[correct], features[correct])
         np.add.at(counts, labels[correct], 1)
-        fallback = logits[correct].mean(axis=0)
+        fallback = features[correct].mean(axis=0)
     else:
-        fallback = logits.mean(axis=0)
+        fallback = features.mean(axis=0)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         means = sums / counts[:, None]
@@ -85,14 +104,18 @@ def class_means(
 
 
 def neighbor_sets(
-    logits: np.ndarray,
+    features: np.ndarray,
     labels: np.ndarray,
     means: np.ndarray,
     num_labels: int,
     k: int,
     mode: str = "corrected",
+    predicted: np.ndarray | None = None,
 ) -> np.ndarray:
     """Tập K class "gần" của từng lớp dự đoán, dạng ma trận bool (num_labels × num_labels).
+
+    `features` là không gian tính khoảng cách (logits hoặc embedding);
+    `predicted` cho phép dùng lớp dự đoán từ logits khi feature là embedding.
 
     Upstream xếp hạng bằng tổng `||Mean_k − x|| − ||Mean_d − x||` trên các mẫu
     validation được phân loại đúng, rồi lấy K giá trị nhỏ nhất. Vì `Values[i][i]`
@@ -102,13 +125,14 @@ def neighbor_sets(
     if mode not in {"reference", "corrected"}:
         raise ValueError(f"mode khong hop le: {mode}")
 
-    logits = np.asarray(logits, dtype=np.float64)
+    features = np.asarray(features, dtype=np.float64)
     labels = np.asarray(labels)
-    correct = logits.argmax(axis=1) == labels
+    predicted = _resolve_predicted(features, predicted)
+    correct = predicted == labels
 
     values = np.zeros((num_labels, num_labels), dtype=np.float64)
     if correct.any():
-        x = logits[correct]
+        x = features[correct]
         y = labels[correct]
         dist = pairwise_distances(x, means)
         dist_true = dist[np.arange(len(y)), y]
@@ -130,30 +154,38 @@ def neighbor_sets(
 
 
 def klnd_anomaly(
-    logits: np.ndarray,
+    features: np.ndarray,
     means: np.ndarray,
     neighbors: np.ndarray,
     method: int,
     restrict_neighbors: bool,
+    predicted: np.ndarray | None = None,
+    guard_denominator: bool = True,
 ) -> np.ndarray:
     """Ba biến thể K-LND của upstream (method 1, 2, 3).
+
+    `features` là không gian tính khoảng cách (logits hoặc embedding);
+    `predicted` cho phép dùng lớp dự đoán từ logits khi feature là embedding.
 
     `restrict_neighbors=True` chỉ cộng trên tập K láng giềng (nhánh **open** của
     upstream); `False` cộng trên **mọi** class khác (nhánh **closed** của upstream).
     Sự bất đối xứng này là lỗi được tái hiện trong chế độ `reference`.
+
+    `guard_denominator=False` tái hiện đúng upstream method 3: không chặn mẫu số
+    0 nên có thể trả NaN/inf. Chế độ `corrected` luôn bật guard.
     """
     if method not in (1, 2, 3):
         raise ValueError(f"method khong hop le: {method}")
 
-    logits = np.asarray(logits, dtype=np.float64)
-    predicted = logits.argmax(axis=1)
-    rows = np.arange(logits.shape[0])
+    features = np.asarray(features, dtype=np.float64)
+    predicted = _resolve_predicted(features, predicted)
+    rows = np.arange(features.shape[0])
 
     if method == 1:
-        distances = pairwise_distances(logits, means)
+        distances = pairwise_distances(features, means)
         return distances[rows, predicted]
 
-    distances = pairwise_distances(logits, means)
+    distances = pairwise_distances(features, means)
     dist_pred = distances[rows, predicted]
 
     if restrict_neighbors:
@@ -171,4 +203,7 @@ def klnd_anomaly(
         return -(total - count * dist_pred)
 
     # method 3: Tot = dist_d / Σ dist_k, reject nếu Tot > TH
-    return dist_pred / np.maximum(total, EPS)
+    if guard_denominator:
+        return dist_pred / np.maximum(total, EPS)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return dist_pred / total

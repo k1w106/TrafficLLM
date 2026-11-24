@@ -75,6 +75,7 @@ def run(
         int(config["model"]["num_labels"]),
         device,
         str(config["model"].get("attn_implementation", "eager")),
+        pretrained=bool(config["model"].get("pretrained", True)),
     )
     print(f"device={device} | trainable params={count_parameters(model) / 1e6:.1f}M", flush=True)
 
@@ -153,7 +154,7 @@ def main() -> None:
         Path(config["metrics"]["output_path"]),
         {
             "experiment": config["experiment"],
-            "phase": "P3",
+            "phase": config.get("phase", "P3"),
             "seed": config["seed"],
             "amp": config["train"]["amp"],
             "history": history,

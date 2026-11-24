@@ -50,6 +50,12 @@ không chạy lại model.
 - `model_label` 0..11 cho class known, **12 = unknown**. Luôn map qua
   `metadata.json["class_to_model_label"]`. **Không bao giờ giả định nhãn gốc = chỉ số của model.**
 - Không sửa hay tạo lại các file trong `ustc_seed42/` trừ khi user yêu cầu.
+- DC (run phụ P5): 10 class video, 500 giá trị packet-count/trace, 3.198 trace; split seed 42
+  `closed_train` 894 / `closed_valid` 192 / `closed_test` 192 / `open_valid` 960 / `open_test` 960.
+  Known random {0,4,5,6}, open {1,2,3,7,8,9}; khác upstream first-4, có `--known-mode first-n` nếu cần.
+- DC encoding: reference dùng nhãn trong pattern (leaky), corrected label-free dồn bit 1 sang trái;
+  `divisor` mặc định 50 (code upstream), paper ghi 40. Token p50 2.012, **99,78% > 1024** → truncate.
+  DC chỉ là run phụ audit leakage; kết quả đã có trong `outputs/metrics/audit_dc_seed42.{json,csv}`.
 
 ## 6. Luật cứng (vi phạm bất kỳ luật nào là làm hỏng đồ án)
 1. **Nhãn không bao giờ đi vào encoding/tiền xử lý.** `encode_trace_gpt2(raw_trace)` chỉ nhận đúng một tham số;
@@ -105,9 +111,15 @@ Trước khi code, nêu kế hoạch trong ≤10 dòng. Chỉ đụng vào file 
   metric (`src/trafficllm/evaluation/metrics.py`), runner `scripts/run_openset.py`,
   config `configs/openset_ustc_seed42.yaml`, test Gaussian + metric, mục OpenMax trong `docs/protocol.md`,
   dòng P4 trong `docs/experiment-log.md`, kết quả `outputs/metrics/openset_ustc_seed42.{json,csv}`.
-- **P5 (chưa làm)** audit: chạy `reference` so với `corrected` trên cùng cache và giải thích mọi chênh lệch.
+- **P5 ✅** audit: chạy `reference` so với `corrected` trên cùng cache và giải thích mọi chênh lệch.
   DC cần **lần huấn luyện thứ hai** (leakage nằm ở encoding nên không dùng chung cache feature được).
   Thêm một run riêng, đặt tên rõ ràng, theo thiết lập của paper (paper nói 40% số class là closed = 8/20).
+  Đã có: `scripts/run_audit.py` (4 biến thể + `same_branch`, `self_neighbor`, `calibration_correct_only`,
+  `msp_saturation`), `outputs/metrics/audit_ustc_seed42.{json,csv}`, mục P5 trong `docs/protocol.md`,
+  dòng P5 trong `docs/experiment-log.md`; DC manifest/encoding/config/`scripts/run_dc_audit.py` đã xong, 40 test pass.
+  DC đã train + extract + audit: reference `closed_test` 1,0000; corrected 0,7812; bỏ leakage làm UCR
+  0,60–0,82 → 0,09–0,13, CCR −0,18–0,20; K-LND1 AUROC 0,9137 → 0,6429, OpenMax 0,9572 → 0,6028;
+  MSP AUROC 0,5518 → 0,6817 nhưng UCR 0,7833 → 0,1167. Kết quả `outputs/metrics/audit_dc_seed42.{json,csv}`.
   Xong khi: có bảng so sánh hai chế độ cho cả 6 detector; mỗi chênh lệch truy được về nguyên nhân cụ thể
   (self-neighbor, bất đối xứng closed/open, chiều phân vị, operating point); run DC được đánh dấu rõ là run phụ.
 - **P6 (chưa làm)** mở rộng: adapter AWF/DF (cắt/streaming lúc load), đối chứng GPT-2 random-init,

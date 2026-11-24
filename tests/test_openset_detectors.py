@@ -161,6 +161,42 @@ def test_klnd_method3_zero_denominator_is_guarded() -> None:
     assert np.isfinite(scores).all()
 
 
+def test_klnd_method3_reference_does_not_guard_denominator() -> None:
+    """Mode reference phải tái hiện upstream: 0/0 -> NaN thay vì epsilon."""
+    means = np.zeros((2, 4))
+    logits = np.zeros((1, 4))
+    neighbors = np.ones((2, 2), dtype=bool)
+    scores = klnd_anomaly(
+        logits,
+        means,
+        neighbors,
+        method=3,
+        restrict_neighbors=False,
+        guard_denominator=False,
+    )
+    assert not np.isfinite(scores).all()
+
+
+def test_klnd_feature_ablation_can_use_external_predicted() -> None:
+    """Embedding làm feature nhưng lớp dự đoán lấy từ logits."""
+    rng = np.random.default_rng(0)
+    features = rng.normal(size=(30, 4))
+    logits = np.zeros((30, 2))
+    labels = np.repeat([0, 1], 15)
+    logits[np.arange(30), labels] = 10.0
+    means, counts = class_means(features, labels, 2, predicted=logits.argmax(1))
+    assert counts.tolist() == [15, 15]
+    neighbors = neighbor_sets(
+        features, labels, means, 2, k=1, predicted=logits.argmax(1)
+    )
+    scores = klnd_anomaly(
+        features, means, neighbors, 1, restrict_neighbors=True,
+        predicted=logits.argmax(1),
+    )
+    assert scores.shape == (30,)
+    assert np.isfinite(scores).all()
+
+
 def test_openmax_penalizes_far_confident_sample() -> None:
     data = make_gaussian()
     model = fit_openmax(

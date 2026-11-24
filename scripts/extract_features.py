@@ -93,6 +93,7 @@ def main() -> None:
         int(config["model"]["num_labels"]),
         device,
         str(config["model"].get("attn_implementation", "eager")),
+        pretrained=bool(config["model"].get("pretrained", True)),
     )
     payload = load_checkpoint(model, checkpoint_path, device)
     print(
@@ -124,7 +125,7 @@ def main() -> None:
 
     metrics = {
         "experiment": config["experiment"],
-        "phase": "P3-features",
+        "phase": f"{config.get('phase', 'P3')}-features",
         "seed": config["seed"],
         "checkpoint": str(checkpoint_path),
         "n_samples": int(len(sample_ids)),

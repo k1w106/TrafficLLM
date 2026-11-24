@@ -1,0 +1,48 @@
+{
+  "experiment": "dc_gpt2_seed42_corrected",
+  "phase": "P5-features",
+  "seed": 42,
+  "checkpoint": "outputs/checkpoints/dc_gpt2_seed42_corrected.pt",
+  "n_samples": 3198,
+  "n_labels": 4,
+  "feature_shapes": {
+    "logits": [
+      3198,
+      4
+    ],
+    "emb_last": [
+      3198,
+      768
+    ],
+    "emb_mean": [
+      3198,
+      768
+    ]
+  },
+  "accuracy_by_partition": {
+    "open_test": {
+      "n": 960,
+      "accuracy": null,
+      "note": "open-set: nhan 4 = unknown, accuracy khong co nghia"
+    },
+    "open_valid": {
+      "n": 960,
+      "accuracy": null,
+      "note": "open-set: nhan 4 = unknown, accuracy khong co nghia"
+    },
+    "closed_train": {
+      "n": 894,
+      "accuracy": 0.863535
+    },
+    "closed_valid": {
+      "n": 192,
+      "accuracy": 0.822917
+    },
+    "closed_test": {
+      "n": 192,
+      "accuracy": 0.78125
+    }
+  },
+  "seconds": 466.2,
+  "output": "outputs/features/dc_seed42_corrected.npz"
+}

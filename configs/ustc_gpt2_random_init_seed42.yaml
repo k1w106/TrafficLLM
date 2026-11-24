@@ -1,0 +1,41 @@
+# P6 — đối chứng GPT-2 random-init (cùng kiến trúc, không pretrain).
+experiment: ustc_gpt2_random_init_seed42
+mode: corrected
+seed: 42
+
+data:
+  encoded_path: data/processed/ustc_seed42/encoded_gpt2.parquet
+  text_column: text
+  label_column: model_label
+  train_partition: closed_train
+  valid_partition: closed_valid
+  test_partition: closed_test
+
+model:
+  name: gpt2
+  num_labels: 12
+  max_len: 1024
+  attn_implementation: eager
+  pretrained: false       # weight random, cùng GPT2Config
+
+train:
+  batch_size: 12
+  eval_batch_size: 32
+  learning_rate: 5.0e-5
+  weight_decay: 0.01
+  adam_eps: 1.0e-8
+  epochs: 3
+  warmup_steps: 0
+  grad_clip: 1.0
+  amp: bf16
+  deterministic: true
+  num_workers: 0
+  checkpoint_dir: outputs/checkpoints
+  checkpoint_name: ustc_gpt2_random_init_seed42.pt
+
+features:
+  output_path: outputs/features/ustc_random_init_seed42.npz
+  batch_size: 32
+
+metrics:
+  output_path: outputs/metrics/ustc_gpt2_random_init_seed42.json
