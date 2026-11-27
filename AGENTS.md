@@ -1,9 +1,7 @@
 # AGENTS.md — Đồ án tái lập và kiểm toán TrafficLLM
 
 ## 1. Đây là dự án gì
-Đồ án môn học (UIT, NT140) của HND. Ta tái lập và **kiểm toán** paper
-"TrafficLLM: LLMs for improved open-set encrypted traffic analysis" (Ginige và cộng sự, Computer Networks, 2026)
-bằng một **codebase độc lập**.
+Tái lập và **kiểm toán** paper "TrafficLLM: LLMs for improved open-set encrypted traffic analysis" (Ginige và cộng sự, Computer Networks, 2026) bằng một **codebase độc lập**.
 
 - Repo gốc của tác giả (github.com/YasodGinige/TrafficLLM) **chỉ để tham khảo**. Không copy code hay cấu trúc của họ.
   Đọc để đối chiếu hành vi thì được.
@@ -122,10 +120,12 @@ Trước khi code, nêu kế hoạch trong ≤10 dòng. Chỉ đụng vào file 
   MSP AUROC 0,5518 → 0,6817 nhưng UCR 0,7833 → 0,1167. Kết quả `outputs/metrics/audit_dc_seed42.{json,csv}`.
   Xong khi: có bảng so sánh hai chế độ cho cả 6 detector; mỗi chênh lệch truy được về nguyên nhân cụ thể
   (self-neighbor, bất đối xứng closed/open, chiều phân vị, operating point); run DC được đánh dấu rõ là run phụ.
-- **P6 (chưa làm)** mở rộng: adapter AWF/DF (cắt/streaming lúc load), đối chứng GPT-2 random-init,
-  ablation logits so với embedding, ≥3 seed → mean ± std.
-  Xong khi: mỗi mục có bảng riêng, ghi rõ seed và cấu hình, kết quả báo mean ± std chứ không phải một lần chạy.
-- **P7 (chưa làm)** báo cáo: `docs/audit-report.md`, hình, bảng, hạn chế.
+- **P6 ✅** mở rộng: ablation logits/emb_last/emb_mean (3 seed mean±std); đối chứng GPT-2 random-init
+  (3 seed mean±std, random-init ngang hoặc tốt hơn pretrained); seed sweep pretrained 42/43/44;
+  adapter AWF/DF (encoding + manifest + test, AWF đã encode, DF/full train là tuỳ chọn).
+  Kết quả `outputs/metrics/seed_sweep_ustc_{pretrained,random_init}.{json,csv}`,
+  `outputs/metrics/ablation_ustc{,_random_init}_seed{42,43,44}.json`.
+- **P7 ✅** báo cáo: `docs/audit-report.md`, bảng, hạn chế.
   Xong khi: mọi con số trong báo cáo truy được về một dòng của `docs/experiment-log.md` và một file trong
   `outputs/metrics/`; phần hạn chế nêu rõ khác biệt split so với paper và những gì chưa làm.
 
