@@ -1,4 +1,3 @@
-# P5 (run phu) — audit encoding DC: reference (co nhan) vs corrected (label-free).
 experiment: audit_dc_seed42
 phase: P5
 seed: 42

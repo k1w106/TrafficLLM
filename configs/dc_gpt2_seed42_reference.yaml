@@ -1,4 +1,3 @@
-# P5 (run phu) — fine-tune GPT-2 tren DC voi encoding reference (co nhan).
 experiment: dc_gpt2_seed42_reference
 phase: P5
 mode: reference

@@ -1,13 +1,3 @@
-"""Gộp kết quả nhiều seed thành mean ± std (P6).
-
-Đọc JSON do `run_openset.py`, `run_ablation.py`, `extract_features.py` sinh ra
-cho từng seed. Không tính lại metric; chỉ thống kê trên các file đã có.
-
-Usage:
-    python3 scripts/aggregate_seeds.py --seeds 42 43 44
-    python3 scripts/aggregate_seeds.py --seeds 42 43 44 --random-init
-"""
-
 from __future__ import annotations
 
 import argparse

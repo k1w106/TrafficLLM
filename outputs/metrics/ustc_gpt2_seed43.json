@@ -1,0 +1,48 @@
+{
+  "experiment": "ustc_gpt2_seed43",
+  "phase": "P3-features",
+  "seed": 43,
+  "checkpoint": "outputs/checkpoints/ustc_gpt2_seed43.pt",
+  "n_samples": 97115,
+  "n_labels": 12,
+  "feature_shapes": {
+    "logits": [
+      97115,
+      12
+    ],
+    "emb_last": [
+      97115,
+      768
+    ],
+    "emb_mean": [
+      97115,
+      768
+    ]
+  },
+  "accuracy_by_partition": {
+    "closed_train": {
+      "n": 39980,
+      "accuracy": 0.999925
+    },
+    "open_valid": {
+      "n": 20000,
+      "accuracy": null,
+      "note": "open-set: nhan 12 = unknown, accuracy khong co nghia"
+    },
+    "closed_test": {
+      "n": 8568,
+      "accuracy": 0.99965
+    },
+    "open_test": {
+      "n": 20000,
+      "accuracy": null,
+      "note": "open-set: nhan 12 = unknown, accuracy khong co nghia"
+    },
+    "closed_valid": {
+      "n": 8567,
+      "accuracy": 0.999883
+    }
+  },
+  "seconds": 944.9,
+  "output": "outputs/features/ustc_seed43.npz"
+}

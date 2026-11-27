@@ -373,3 +373,99 @@ Tác động riêng của encoding (corrected − reference_corrected_protocol):
 - **Kết luận:** DC chỉ là run phụ audit. Số reference không dùng làm kết quả
   chính; số corrected cho thấy open-set trên DC khó hơn nhiều khi không có nhãn
   trong encoding. Cần nêu truncation 99,78% >1024 token khi so với paper.
+
+## P6 — Mở rộng
+
+### Ablation: logits vs embedding (USTC, seed 42, corrected, keep_rate 0,95)
+
+So sánh ba không gian feature cho K-LND 1/2/3. Lớp dự đoán luôn lấy từ logits
+(argmax); chỉ feature tính khoảng cách/anomaly score thay đổi.
+
+| Feature | Detector | UCR | AUROC | FPR@95 | OSCR | balanced F1 (1:1) |
+|---|---|---:|---:|---:|---:|---:|
+| logits | K-LND 1 | 0,7944 | 0,9584 | 0,1912 | 0,9437 | 0,8706 |
+| logits | K-LND 2 | 0,6961 | 0,9291 | 0,3707 | 0,9497 | 0,8208 |
+| logits | K-LND 3 | 0,7627 | 0,9600 | 0,2045 | 0,9447 | 0,8547 |
+| emb_last | K-LND 1 | 0,6686 | 0,9081 | 0,4786 | 0,9483 | 0,8053 |
+| emb_last | K-LND 2 | 0,6196 | 0,9106 | 0,4786 | 0,9518 | 0,7809 |
+| emb_last | K-LND 3 | 0,6612 | 0,9224 | 0,4245 | 0,9512 | 0,8029 |
+| emb_mean | K-LND 1 | 0,4182 | 0,7387 | 0,5175 | 0,9484 | 0,6594 |
+| emb_mean | K-LND 2 | 0,4367 | 0,7459 | 0,8075 | 0,9523 | 0,6727 |
+| emb_mean | K-LND 3 | 0,4377 | 0,7604 | 0,5292 | 0,9477 | 0,6704 |
+
+**Đọc kết quả:**
+- **Logits tốt nhất cho open-set.** K-LND 1 trên logits đạt AUROC 0,9584 và UCR
+  0,7944; `emb_last` giảm ~5 pp AUROC và ~13 pp UCR; `emb_mean` mất ~20 pp AUROC
+  và ~38 pp UCR.
+- **CCR gần như không đổi** (~0,944–0,952) vì threshold giữ cùng keep_rate; sự khác
+  biệt chủ yếu ở khả năng reject mẫu open.
+- **FPR@95TPR** tăng mạnh khi dùng embedding, nghĩa là cần chấp nhận nhiều dương
+  tính giả hơn để giữ 95% phát hiện open.
+- Lý giải: logits (12-dim) là không gian compact, hướng trực tiếp theo class
+  boundary; `emb_last` (768-dim) giàu thông tin nhưng nhiễu chiều cao hơn;
+  `emb_mean` (768-dim) trung bình qua vị trí token nên mất tín hiệu cục bộ.
+
+### Random-init GPT-2 (đối chứng, seed 42)
+
+So sánh GPT-2 small pretrained vs cùng kiến trúc khởi tạo ngẫu nhiên
+(`GPT2Config.from_pretrained` + `GPT2ForSequenceClassification` không load trọng số).
+Mục đích: tách contribution của pretrained knowledge khỏi kiến trúc transformer.
+
+| Detector | Pretrained (CCR / UCR / AUROC / FPR95) | Random-init (CCR / UCR / AUROC / FPR95) |
+|---|---|---|
+| MSP | 0,9545 / 0,7710 / 0,8876 / 0,7443 | 0,9471 / 0,8134 / 0,9376 / 0,3023 |
+| Energy | 0,9503 / 0,7513 / 0,9148 / 0,3979 | 0,9482 / 0,8376 / 0,9370 / 0,3200 |
+| K-LND 1 | 0,9437 / 0,7944 / 0,9584 / 0,1912 | 0,9458 / 0,8523 / 0,9598 / 0,2871 |
+| K-LND 2 | 0,9497 / 0,6960 / 0,9291 / 0,3707 | 0,9475 / 0,8559 / **0,9707** / 0,1675 |
+| K-LND 3 | 0,9447 / 0,7627 / 0,9600 / 0,2045 | 0,9448 / 0,8549 / 0,9622 / 0,2641 |
+| OpenMax | 0,9483 / 0,6674 / 0,8887 / 0,5158 | 0,9450 / 0,8569 / **0,9611** / 0,2586 |
+
+**Đọc kết quả:**
+- **Closed-set:** random-init chỉ thấp hơn 0,0002 accuracy (0,9995 vs 0,9998) →
+  kiến trúc transformer đủ mạnh để phân loại USTC ngay cả không có pretrained.
+- **Open-set:** random-init **tốt hơn pretrained** ở hầu hết detector:
+  UCR tăng +4–19 pp; AUROC tăng hoặc ngang; FPR@95 giảm (tốt hơn) ở MSP,
+  Energy, K-LND2, OpenMax.
+- **Giả thuyết:** pretrained knowledge về ngôn ngữ tự nhiên không khớp với
+  phân phối lưu lượng mạng. Random-init học biểu diễn "thuần" cho traffic, không
+  bị kéo bởi ngữ nghĩa sẵn có → khoảng cách giữa class rõ ràng hơn → phát hiện
+  lạ tốt hơn. Đây là phát hiện quan trọng: paper claim pretrained giúp nhưng
+  thực tế trên USTC thì không, ít nhất với encoding hiện tại.
+### Random-init mean ± std (3 seed: 42, 43, 44)
+
+| Detector | Pretrained AUROC | Random-init AUROC | Pretrained UCR | Random-init UCR |
+|---|---|---|---|---|
+| K-LND 1 | 0,9648 ± 0,0056 | 0,9635 ± 0,0119 | 0,8630 ± 0,0683 | 0,8451 ± 0,0406 |
+| K-LND 2 | 0,9484 ± 0,0183 | **0,9736 ± 0,0044** | 0,8327 ± 0,1226 | 0,8465 ± 0,0397 |
+| K-LND 3 | 0,9659 ± 0,0051 | 0,9659 ± 0,0105 | 0,8542 ± 0,0860 | 0,8474 ± 0,0409 |
+
+Kết luận mean±std xác nhận: random-init **ngang hoặc tốt hơn** pretrained.
+K-LND 2 random-init vượt rõ (+2,5 pp AUROC, std nhỏ hơn 4×).
+Random-init có std thấp hơn pretrained ở UCR → ổn định hơn.
+
+### Seed sweep pretrained (3 seed: 42, 43, 44)
+
+| Detector | CCR (mean±std) | UCR (mean±std) | AUROC (mean±std) |
+|---|---|---|---|
+| K-LND 1 | 0,9481 ± 0,0038 | 0,8630 ± 0,0683 | 0,9648 ± 0,0056 |
+| K-LND 2 | 0,9495 ± 0,0009 | 0,8327 ± 0,1226 | 0,9484 ± 0,0183 |
+| K-LND 3 | 0,9491 ± 0,0038 | 0,8542 ± 0,0860 | 0,9659 ± 0,0051 |
+
+**Đọc kết quả:**
+- AUROC ổn định (std < 0,006 cho K-LND 1/3), CCR cũng ổn (std < 0,004).
+- UCR dao động lớn hơn (std 0,07–0,12) → operating point nhạy cảm với seed hơn
+  ranking toàn cục (AUROC).
+- Closed-test accuracy: 0,9997 ± 0,0001 (gần như hoàn hảo ở mọi seed).
+
+### AWF/DF adapter
+
+Adapter streaming/mmap cho AWF và DF; không load toàn bộ vào RAM.
+Encoding theo paper; reference tái hiện bug upstream (AWF bỏ pair cuối),
+corrected giữ pair cuối.
+
+- AWF encoding: `src/trafficllm/encoding/awf.py`; manifest + parquet đã có
+  (`data/processed/awf_seed42/`); 280.000 trace, 200 known class + 100k open
+  (label 200); **100% trace 2.500 token → truncate 1024**.
+- DF encoding: `src/trafficllm/encoding/df.py` (cùng encoding AWF); manifest
+  builder `scripts/build_df_manifest.py`; 95 class (60 known upstream / 35 open);
+  **chưa encode + chưa train**.

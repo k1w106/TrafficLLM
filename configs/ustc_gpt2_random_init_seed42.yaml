@@ -1,4 +1,3 @@
-# P6 — đối chứng GPT-2 random-init (cùng kiến trúc, không pretrain).
 experiment: ustc_gpt2_random_init_seed42
 mode: corrected
 seed: 42

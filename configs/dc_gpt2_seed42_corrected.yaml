@@ -1,4 +1,3 @@
-# P5 (run phu) — fine-tune GPT-2 tren DC voi encoding corrected (label-free).
 experiment: dc_gpt2_seed42_corrected
 phase: P5
 mode: corrected

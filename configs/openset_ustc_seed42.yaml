@@ -1,4 +1,3 @@
-# P4 — chạy detector open-set trên cache feature USTC seed 42.
 experiment: openset_ustc_seed42
 phase: P4
 seed: 42

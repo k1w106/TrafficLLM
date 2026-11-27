@@ -1,4 +1,3 @@
-# P6 — ablation feature cho K-LND trên cache USTC seed 42.
 experiment: ablation_features_ustc_seed42
 phase: P6
 seed: 42

@@ -50,15 +50,22 @@ def _write(config: dict[str, Any], path: Path) -> None:
         yaml.safe_dump(config, handle, allow_unicode=True, sort_keys=False)
 
 
-def _replace_seed(value: Any, seed: int) -> Any:
+_DATA_KEYS = {"encoded_path", "manifest_path"}
+
+
+def _replace_seed(value: Any, seed: int, *, _key: str = "") -> Any:
     if isinstance(value, dict):
         return {
-            key: (seed if key in {"seed", "balanced_f1_seed"} else _replace_seed(item, seed))
+            key: (
+                seed
+                if key in {"seed", "balanced_f1_seed"}
+                else _replace_seed(item, seed, _key=key)
+            )
             for key, item in value.items()
         }
     if isinstance(value, list):
         return [_replace_seed(item, seed) for item in value]
-    if isinstance(value, str):
+    if isinstance(value, str) and _key not in _DATA_KEYS:
         return value.replace("seed42", f"seed{seed}")
     return value
 
